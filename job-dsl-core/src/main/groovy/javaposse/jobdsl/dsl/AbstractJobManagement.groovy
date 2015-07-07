@@ -1,8 +1,5 @@
 package javaposse.jobdsl.dsl
 
-import static javaposse.jobdsl.dsl.DslScriptHelper.getSourceDetails
-import static javaposse.jobdsl.dsl.DslScriptHelper.stackTrace
-
 /**
  * Abstract base class providing common functionality for all {@link JobManagement} implementations.
  */
@@ -36,19 +33,19 @@ abstract class AbstractJobManagement implements JobManagement {
 
     @Override
     void logDeprecationWarning() {
-        List<StackTraceElement> currentStackTrack = stackTrace
-        String details = getSourceDetails(currentStackTrack)
+        List<StackTraceElement> currentStackTrack = DslScriptHelper.stackTrace
+        String details = DslScriptHelper.getSourceDetails(currentStackTrack)
         logDeprecationWarning(currentStackTrack[0].methodName, details)
     }
 
     @Override
     void logDeprecationWarning(String subject) {
-        logDeprecationWarning(subject, sourceDetails)
+        logDeprecationWarning(subject, DslScriptHelper.sourceDetails)
     }
 
     @Override
     void logDeprecationWarning(String subject, String scriptName, int lineNumber) {
-        logDeprecationWarning(subject, getSourceDetails(scriptName, lineNumber))
+        logDeprecationWarning(subject, DslScriptHelper.getSourceDetails(scriptName, lineNumber))
     }
 
     protected void logDeprecationWarning(String subject, String details) {
@@ -72,7 +69,27 @@ abstract class AbstractJobManagement implements JobManagement {
         }
     }
 
-    protected void logWarning(String message, String details = getSourceDetails()) {
+    @Deprecated
+    protected static List<StackTraceElement> getStackTrace() {
+        DslScriptHelper.stackTrace
+    }
+
+    @Deprecated
+    protected static String getSourceDetails(List<StackTraceElement> stackTrace) {
+        DslScriptHelper.getSourceDetails(stackTrace)
+    }
+
+    @Deprecated
+    protected static String getSourceDetails(String scriptName, int lineNumber) {
+        DslScriptHelper.getSourceDetails(scriptName, lineNumber)
+    }
+
+    @Deprecated
+    protected void logWarning(String message, Object... args) {
+        outputStream.printf("Warning: $message\n", args)
+    }
+
+    protected void logWarning(String message, String details = DslScriptHelper.getSourceDetails()) {
         outputStream.println("Warning: ($details) $message")
     }
 }

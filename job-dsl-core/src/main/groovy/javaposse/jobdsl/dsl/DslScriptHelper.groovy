@@ -10,12 +10,21 @@ import static org.codehaus.groovy.runtime.StackTraceUtils.isApplicationClass
  * @since 1.36
  */
 class DslScriptHelper {
+    private static final Set<String> CLASS_FILTER = [
+            DslScriptHelper.name,
+            JobManagement.name,
+            AbstractJobManagement.name,
+    ]
+
     private DslScriptHelper() {
     }
 
     static List<StackTraceElement> getStackTrace() {
-        List<StackTraceElement> result = currentThread().stackTrace.findAll { isApplicationClass(it.className) }
-        result[4..-1]
+        currentThread().stackTrace.findAll { StackTraceElement element ->
+            isApplicationClass(element.className) &&
+                    !(element.className in CLASS_FILTER) &&
+                    !CLASS_FILTER.any { element.className.startsWith(it + '$') }
+        }
     }
 
     static String getSourceDetails() {
