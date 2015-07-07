@@ -17,6 +17,8 @@ Have a look at the [Jenkins Job DSL Gradle example](https://github.com/sheehan/j
 
 ## Release Notes
 * 1.36 (unreleased)
+ * Improved error logging
+   ([JENKINS-16354](https://issues.jenkins-ci.org/browse/JENKINS-16354))
 * 1.35 (July 01 2015)
  * Added support for the [Build Flow Test Aggregator Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Build+Flow+Test+Aggregator+Plugin)
    ([JENKINS-28851](https://issues.jenkins-ci.org/browse/JENKINS-28851))
