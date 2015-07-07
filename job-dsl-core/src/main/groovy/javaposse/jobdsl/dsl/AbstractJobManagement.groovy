@@ -1,7 +1,7 @@
 package javaposse.jobdsl.dsl
 
-import static java.lang.Thread.currentThread
-import static org.codehaus.groovy.runtime.StackTraceUtils.isApplicationClass
+import static javaposse.jobdsl.dsl.DslScriptHelper.getSourceDetails
+import static javaposse.jobdsl.dsl.DslScriptHelper.stackTrace
 
 /**
  * Abstract base class providing common functionality for all {@link JobManagement} implementations.
@@ -43,7 +43,7 @@ abstract class AbstractJobManagement implements JobManagement {
 
     @Override
     void logDeprecationWarning(String subject) {
-        logDeprecationWarning(subject, getSourceDetails(stackTrace))
+        logDeprecationWarning(subject, sourceDetails)
     }
 
     @Override
@@ -70,27 +70,6 @@ abstract class AbstractJobManagement implements JobManagement {
         if (name == null || name.empty) {
             throw new NameNotProvidedException()
         }
-    }
-
-    protected static List<StackTraceElement> getStackTrace() {
-        List<StackTraceElement> result = currentThread().stackTrace.findAll { isApplicationClass(it.className) }
-        result[4..-1]
-    }
-
-    protected static String getSourceDetails(List<StackTraceElement> stackTrace) {
-        StackTraceElement source = stackTrace.find { !it.className.startsWith('javaposse.jobdsl.') }
-        getSourceDetails(source?.fileName, source == null ? -1 : source.lineNumber)
-    }
-
-    protected static String getSourceDetails(String scriptName, int lineNumber) {
-        String details = 'unknown source'
-        if (scriptName != null) {
-            details = scriptName.matches(/script\d+\.groovy/) ? 'DSL script' : scriptName
-            if (lineNumber > 0) {
-                details += ", line ${lineNumber}"
-            }
-        }
-        details
     }
 
     protected void logWarning(String message, Object... args) {
