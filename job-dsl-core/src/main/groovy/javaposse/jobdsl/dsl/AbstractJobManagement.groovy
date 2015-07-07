@@ -52,7 +52,7 @@ abstract class AbstractJobManagement implements JobManagement {
     }
 
     protected void logDeprecationWarning(String subject, String details) {
-        logWarningWithDetails("${subject} is deprecated", details)
+        logWarning("${subject} is deprecated", details)
     }
 
     protected static void validateUpdateArgs(String jobName, String config) {
@@ -72,11 +72,7 @@ abstract class AbstractJobManagement implements JobManagement {
         }
     }
 
-    protected void logWarningWithDetails(String message, String details = getSourceDetails()) {
-        logWarning('(%s) %s', details, message)
-    }
-
-    protected void logWarning(String message, Object... args) {
-        outputStream.printf("Warning: $message\n", args)
+    protected void logWarning(String message, String details = getSourceDetails()) {
+        outputStream.println("Warning: ($details) $message")
     }
 }
