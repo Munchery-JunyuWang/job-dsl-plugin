@@ -1,4 +1,4 @@
-**NOTE: See the [[Job Reference]], [[View Reference]] and [[Folder Reference]] pages for details about all options.**
+**NOTE: See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/) for details about all options.**
 
 # DSL Methods
 
@@ -43,6 +43,8 @@ freeStyleJob(String name, Closure closure = null) // since 1.30
 
 buildFlowJob(String name, Closure closure = null) // since 1.30
 
+ivyJob(String name, Closure closure = null)       // since 1.38
+
 matrixJob(String name, Closure closure = null)    // since 1.30
 
 mavenJob(String name, Closure closure = null)     // since 1.30
@@ -61,15 +63,7 @@ myJob.with {
 }
 ```
 
-See the [[Job Reference]] page for details about all job options.
-
-For compatibility with previous releases, a generic `job` method exists which has an optional `type` attribute to
-specify the type of job to be created. The `type` attribute can have a value of `Freeform`, `Maven`, `Multijob`,
-`BuildFlow`, `Matrix` or `Workflow`. When no type is specified, a free-style job will be generated.
-
-```groovy
-job(Map<String, ?> arguments = [:], Closure closure) // deprecated since 1.30
-```
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/) page for details about all job options.
 
 # View
 
@@ -93,16 +87,7 @@ categorizedJobsView(String name, Closure closure = null)  // since 1.31
 
 The view methods behaves like the [job](#job) methods and will return a view object.
 
-See the [[View Reference]] page for details about view options.
-
-For compatibility with previous releases, a generic `view` method exists which has an optional `type` attribute to
-specify the type of view to be created. The `type` attribute can have a value of `ListView`, `BuildPipelineView`,
-`SectionedView`, `NestedView`, `DeliveryPipelineView` or `BuildMonitorView`. When no type is specified, a list view will
-be generated.
-
-```groovy
-view(Map<String, Object> arguments = [:], Closure closure) // since 1.21, deprecated since 1.30
-```
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/) page for details about view options.
 
 # Folder
 
@@ -111,13 +96,11 @@ installed, the DSL can be used to create folders.
 
 ```groovy
 folder(String name, Closure closure = null) // since 1.30
-
-folder(Closure folderClosure)               // since 1.23, deprecated since 1.30
 ```
 
 The `folder` methods behaves like the [job](#job) methods and will return a folder object.
 
-See the [[Folder Reference]] page for details about folder options.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/folder) page for details about folder options.
 
 Folders will be created before jobs and views to ensure that a folder exists before entries are created.
 
@@ -146,6 +129,8 @@ mavenSettingsConfigFile(String name, Closure configFileClosure = null) // since 
 
 These methods behaves like the [job](#job) methods and will return a config file object.
 
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/) page for details about config file options.
+
 Config files will be created before jobs to ensure that the file exists before it is referenced.
 
 ```groovy
@@ -157,14 +142,6 @@ customConfigFile('my-config') {
 mavenSettingsConfigFile('central-mirror') {
   content readFileFromWorkspace('maven-settings/central-mirror.xml')
 }
-```
-
-For compatibility with previous releases, a generic `configFile` method exists which has an optional `type` attribute to
-specify the type of configuration file to be created. The `type` attribute can have a value of `Custom` or
-`MavenSettings`. When no type is specified, a custom config file will be generated.
-
-```groovy
-configFile(Map<String, Object> attributes = [:], Closure closure) // since 1.25, deprecated since 1.30
 ```
 
 # Queue
@@ -284,18 +261,17 @@ the `job` method is no longer available, so it is recommended to pass in the cur
 available to another context. For example, when making utility methods, you would call them like this:
 
 ```groovy
-BuildFramework.ant(this, arg1, arg2)
+BuildFramework.ant(this, 'my-ant-project', 'clean build')
 ```
 
 Then the `BuildFramework` class has everything it needs to make `job` calls:
 
 ```groovy
 class BuildFramework {
-    static ant(dslFactory, arg1, arg2) {
-        dslFactory.job {
-            name arg1
+    static ant(dslFactory, jobName, antTargets) {
+        dslFactory.job(jobName) {
             steps {
-                ant(arg2)
+                ant(antTargets)
             }
         }
     }

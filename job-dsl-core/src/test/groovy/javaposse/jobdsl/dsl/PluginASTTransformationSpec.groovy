@@ -6,15 +6,16 @@ import spock.lang.Specification
 class PluginASTTransformationSpec extends Specification {
     JobManagement jobManagement = Mock(JobManagement)
     FreeStyleJob job = new FreeStyleJob(jobManagement)
+    JobParent jobParent = Spy(JobParent)
 
     def 'require plugin'() {
         when:
         job.publishers {
-            extendedEmail('foo@bar.org')
+            mailer('foo@bar.org')
         }
 
         then:
-        1 * jobManagement.requirePlugin('email-ext')
+        1 * jobManagement.requirePlugin('mailer')
     }
 
     def 'require plugin with minimum version'() {
@@ -26,5 +27,27 @@ class PluginASTTransformationSpec extends Specification {
 
         then:
         1 * jobManagement.requireMinimumPluginVersion('plot', '1.9')
+    }
+
+    def 'require plugin on interface'() {
+        setup:
+        jobParent.jm = jobManagement
+
+        when:
+        jobParent.folder('test')
+
+        then:
+        1 * jobManagement.requirePlugin('cloudbees-folder')
+    }
+
+    def 'require plugin on interface of interface'() {
+        setup:
+        jobParent.jm = jobManagement
+
+        when:
+        jobParent.buildPipelineView('test')
+
+        then:
+        1 * jobManagement.requirePlugin('build-pipeline-plugin')
     }
 }

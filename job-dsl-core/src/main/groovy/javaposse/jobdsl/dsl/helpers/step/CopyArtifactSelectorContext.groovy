@@ -1,16 +1,19 @@
 package javaposse.jobdsl.dsl.helpers.step
 
-import javaposse.jobdsl.dsl.Context
+import javaposse.jobdsl.dsl.AbstractContext
+import javaposse.jobdsl.dsl.JobManagement
+import javaposse.jobdsl.dsl.RequiresPlugin
 
-class CopyArtifactSelectorContext implements Context {
+class CopyArtifactSelectorContext extends AbstractContext {
     Node selector
 
-    CopyArtifactSelectorContext() {
+    CopyArtifactSelectorContext(JobManagement jobManagement) {
+        super(jobManagement)
         latestSuccessful()
     }
 
     /**
-     * Upstream build that triggered this job.
+     * Selects the upstream build that triggered this job.
      *
      * @param fallback Use "Last successful build" as fallback
      */
@@ -23,7 +26,7 @@ class CopyArtifactSelectorContext implements Context {
     }
 
     /**
-     * Latest successful build.
+     * Selects the latest successful build. This is the default selector.
      */
     void latestSuccessful(boolean stable = false) {
         createSelectorNode('StatusBuild') {
@@ -34,14 +37,14 @@ class CopyArtifactSelectorContext implements Context {
     }
 
     /**
-     * Latest saved build (marked "keep forever").
+     * Selects the latest saved build (marked "keep forever").
      */
     void latestSaved() {
         createSelectorNode('SavedBuild')
     }
 
     /**
-     * Specified by permalink.
+     * Selects a build by permalink.
      *
      * @param linkName Values like lastBuild, lastStableBuild
      */
@@ -52,13 +55,15 @@ class CopyArtifactSelectorContext implements Context {
     }
 
     /**
-     * Specific build.
+     * Selects a specific build.
      */
     void buildNumber(int buildNumber) {
         this.buildNumber(Integer.toString(buildNumber))
     }
 
     /**
+     * Selects a specific build.
+     *
      * @since 1.22
      */
     void buildNumber(String buildNumber) {
@@ -68,19 +73,29 @@ class CopyArtifactSelectorContext implements Context {
     }
 
     /**
-     * Copy from workspace of latest completed build.
+     * Copies from workspace of latest completed build.
      */
     void workspace() {
         createSelectorNode('Workspace')
     }
 
     /**
-     * Specified by build parameter.
+     * Selects a build by parameter.
      */
     void buildParameter(String parameterName) {
         createSelectorNode('ParameterizedBuild') {
             delegate.parameterName(parameterName)
         }
+    }
+
+    /**
+     * Selects a build triggered by the current MultiJob build.
+     *
+     * @since 1.40
+     */
+    @RequiresPlugin(id = 'jenkins-multijob-plugin', minimumVersion = '1.17')
+    void multiJobBuild() {
+        selector = new NodeBuilder().'selector'(class: 'com.tikal.jenkins.plugins.multijob.MultiJobBuildSelector')
     }
 
     private void createSelectorNode(String type, Closure nodeBuilder = null) {

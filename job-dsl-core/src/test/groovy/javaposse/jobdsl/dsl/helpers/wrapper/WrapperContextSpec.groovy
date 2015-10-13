@@ -232,23 +232,6 @@ class WrapperContextSpec extends Specification {
         1 * mockJobManagement.requireMinimumPluginVersion('build-timeout', '1.12')
     }
 
-    def 'default timeout will not fail the build'() {
-        when:
-        context.timeout {
-            failBuild()
-            failBuild(false)
-        }
-
-        then:
-        with(context.wrapperNodes[0]) {
-            children().size() == 2
-            strategy[0].children().size() == 1
-            strategy[0].timeoutMinutes[0].value() == 3
-            operationList[0].children().size() == 0
-        }
-        1 * mockJobManagement.requireMinimumPluginVersion('build-timeout', '1.12')
-    }
-
     def 'default timeout will abort the build'() {
         when:
         context.timeout {
@@ -308,7 +291,7 @@ class WrapperContextSpec extends Specification {
         def ports = context.wrapperNodes[0].ports
         ports.'org.jvnet.hudson.plugins.port__allocator.DefaultPortType'[0].name[0].value() == 'HTTP'
         ports.'org.jvnet.hudson.plugins.port__allocator.DefaultPortType'[1].name[0].value() == '8080'
-        1 * mockJobManagement.requirePlugin('port-allocator')
+        (1.._) * mockJobManagement.requirePlugin('port-allocator')
     }
 
     def 'sshAgent without credentials'() {
@@ -319,27 +302,13 @@ class WrapperContextSpec extends Specification {
         thrown(DslScriptException)
     }
 
-    def 'sshAgent with invalid credentials'() {
-        setup:
-        mockJobManagement.getCredentialsId('foo') >> null
-
-        when:
-        context.sshAgent('foo')
-
-        then:
-        thrown(DslScriptException)
-    }
-
     def 'sshAgent'() {
-        setup:
-        mockJobManagement.getCredentialsId('acme') >> '4711'
-
         when:
         context.sshAgent('acme')
 
         then:
         context.wrapperNodes[0].name() == 'com.cloudbees.jenkins.plugins.sshagent.SSHAgentBuildWrapper'
-        context.wrapperNodes[0].user[0].value() == '4711'
+        context.wrapperNodes[0].user[0].value() == 'acme'
         1 * mockJobManagement.requirePlugin('ssh-agent')
     }
 
@@ -599,6 +568,40 @@ class WrapperContextSpec extends Specification {
         params[0].value()[0].name() == 'custom'
         params[0].value()[0].value() == 'value'
         1 * mockJobManagement.requirePlugin('release')
+    }
+
+    def 'phabricator with minimal options'() {
+        when:
+        context.phabricator()
+
+        then:
+        with(context.wrapperNodes[0]) {
+            name() == 'com.uber.jenkins.phabricator.PhabricatorBuildWrapper'
+            children().size() == 3
+            createCommit[0].value() == false
+            applyToMaster[0].value() == false
+            showBuildStartedMessage[0].value() == true
+        }
+        1 * mockJobManagement.requireMinimumPluginVersion('phabricator-plugin', '1.8.1')
+    }
+
+    def 'phabricator with all options'() {
+        when:
+        context.phabricator {
+            createCommit()
+            applyToMaster()
+            showBuildStartedMessage(false)
+        }
+
+        then:
+        with(context.wrapperNodes[0]) {
+            name() == 'com.uber.jenkins.phabricator.PhabricatorBuildWrapper'
+            children().size() == 3
+            createCommit[0].value() == true
+            applyToMaster[0].value() == true
+            showBuildStartedMessage[0].value() == false
+        }
+        1 * mockJobManagement.requireMinimumPluginVersion('phabricator-plugin', '1.8.1')
     }
 
     def 'call preBuildCleanup with minimal options'() {
@@ -863,22 +866,26 @@ class WrapperContextSpec extends Specification {
         String configId2 = 'CustomConfig1417476679250'
         String configName3 = 'myMavenSetttings'
         String configId3 = 'CustomConfig1417476679251'
+        String configName4 = 'myGlobalMavenSetttings'
+        String configId4 = 'CustomConfig1417476679252'
         mockJobManagement.getConfigFileId(ConfigFileType.Custom, configName1) >> configId1
         mockJobManagement.getConfigFileId(ConfigFileType.Custom, configName2) >> configId2
         mockJobManagement.getConfigFileId(ConfigFileType.MavenSettings, configName3) >> configId3
+        mockJobManagement.getConfigFileId(ConfigFileType.GlobalMavenSettings, configName4) >> configId4
 
         when:
         context.configFiles {
             file(configName1)
             custom(configName2)
             mavenSettings(configName3)
+            globalMavenSettings(configName4)
         }
 
         then:
         with(context.wrapperNodes[0]) {
             name() == 'org.jenkinsci.plugins.configfiles.buildwrapper.ConfigFileBuildWrapper'
             children().size() == 1
-            managedFiles[0].children().size() == 3
+            managedFiles[0].children().size() == 4
             with(managedFiles[0].'org.jenkinsci.plugins.configfiles.buildwrapper.ManagedFile'[0]) {
                 children().size() == 3
                 fileId[0].value() == configId1
@@ -894,6 +901,12 @@ class WrapperContextSpec extends Specification {
             with(managedFiles[0].'org.jenkinsci.plugins.configfiles.buildwrapper.ManagedFile'[2]) {
                 children().size() == 3
                 fileId[0].value() == configId3
+                targetLocation[0].value() == ''
+                variable[0].value() == ''
+            }
+            with(managedFiles[0].'org.jenkinsci.plugins.configfiles.buildwrapper.ManagedFile'[3]) {
+                children().size() == 3
+                fileId[0].value() == configId4
                 targetLocation[0].value() == ''
                 variable[0].value() == ''
             }
@@ -924,7 +937,7 @@ class WrapperContextSpec extends Specification {
             name() == 'org.jvnet.hudson.plugins.exclusion.IdAllocator'
             ids[0].'org.jvnet.hudson.plugins.exclusion.DefaultIdType'[0].name[0].value() == 'first'
         }
-        1 * mockJobManagement.requirePlugin('Exclusion')
+        (1.._) * mockJobManagement.requirePlugin('Exclusion')
     }
 
     def 'call exclusion with multiple args'() {
@@ -1019,12 +1032,6 @@ class WrapperContextSpec extends Specification {
     }
 
     def 'call credentials binding'() {
-        setup:
-        mockJobManagement.getCredentialsId('foo') >> 'bar'
-        mockJobManagement.getCredentialsId('bar') >> 'baz'
-        mockJobManagement.getCredentialsId('baz') >> 'foo'
-        mockJobManagement.getCredentialsId('foobar') >> 'foobarbaz'
-
         when:
         context.credentialsBinding {
             file('A', 'foo')
@@ -1042,31 +1049,28 @@ class WrapperContextSpec extends Specification {
             with(bindings[0].'org.jenkinsci.plugins.credentialsbinding.impl.FileBinding'[0]) {
                 children().size() == 2
                 variable[0].value() == 'A'
-                credentialsId[0].value() == 'bar'
+                credentialsId[0].value() == 'foo'
             }
             with(bindings[0].'org.jenkinsci.plugins.credentialsbinding.impl.StringBinding'[0]) {
                 children().size() == 2
                 variable[0].value() == 'B'
-                credentialsId[0].value() == 'baz'
+                credentialsId[0].value() == 'bar'
             }
             with(bindings[0].'org.jenkinsci.plugins.credentialsbinding.impl.UsernamePasswordBinding'[0]) {
                 children().size() == 2
                 variable[0].value() == 'C'
-                credentialsId[0].value() == 'foo'
+                credentialsId[0].value() == 'baz'
             }
             with(bindings[0].'org.jenkinsci.plugins.credentialsbinding.impl.ZipFileBinding'[0]) {
                 children().size() == 2
                 variable[0].value() == 'D'
-                credentialsId[0].value() == 'foobarbaz'
+                credentialsId[0].value() == 'foobar'
             }
         }
         1 * mockJobManagement.requirePlugin('credentials-binding')
     }
 
     def 'call credentials binding with username password multi binding'() {
-        setup:
-        mockJobManagement.getCredentialsId('foo') >> 'bar'
-
         when:
         context.credentialsBinding {
             usernamePassword('A', 'B', 'foo')
@@ -1082,7 +1086,7 @@ class WrapperContextSpec extends Specification {
                 children().size() == 3
                 usernameVariable[0].value() == 'A'
                 passwordVariable[0].value() == 'B'
-                credentialsId[0].value() == 'bar'
+                credentialsId[0].value() == 'foo'
             }
         }
         1 * mockJobManagement.requirePlugin('credentials-binding')
@@ -1175,5 +1179,112 @@ class WrapperContextSpec extends Specification {
             failOnError[0].value() == true
         }
         1 * mockJobManagement.requirePlugin('preSCMbuildstep')
+    }
+
+    def 'buildInDocker with no options'() {
+        when:
+        context.buildInDocker {
+        }
+
+        then:
+        with(context.wrapperNodes[0]) {
+            name() == 'com.cloudbees.jenkins.plugins.okidocki.DockerBuildWrapper'
+            children().size() == 8
+            selector[0].children().size() == 2
+            selector[0].attribute('class') == 'com.cloudbees.jenkins.plugins.okidocki.DockerfileImageSelector'
+            selector[0].contextPath[0].value() == '.'
+            selector[0].dockerfile[0].value() == 'Dockerfile'
+            dockerHost[0].value().empty
+            dockerRegistryCredentials[0].value().empty
+            verbose[0].value() == false
+            volumes[0].value().empty
+            privileged[0].value() == false
+            group[0].value().empty
+            command[0].value() == '/bin/cat'
+        }
+        1 * mockJobManagement.requireMinimumPluginVersion('docker-custom-build-environment', '1.5.1')
+    }
+
+    def 'buildInDocker with dockerfile selector and all options'() {
+        when:
+        context.buildInDocker {
+            dockerfile('test1', 'test2')
+            dockerHostURI('test3')
+            serverCredentials('test4')
+            registryCredentials('test5')
+            volume('test6', 'test7')
+            volume('test8', 'test9')
+            privilegedMode()
+            verbose()
+            userGroup('test10')
+            startCommand('test11')
+        }
+
+        then:
+        with(context.wrapperNodes[0]) {
+            name() == 'com.cloudbees.jenkins.plugins.okidocki.DockerBuildWrapper'
+            children().size() == 8
+            selector[0].children().size() == 2
+            selector[0].attribute('class') == 'com.cloudbees.jenkins.plugins.okidocki.DockerfileImageSelector'
+            selector[0].contextPath[0].value() == 'test1'
+            selector[0].dockerfile[0].value() == 'test2'
+            dockerHost[0].children().size() == 2
+            dockerHost[0].uri[0].value() == 'test3'
+            dockerHost[0].credentialsId[0].value() == 'test4'
+            dockerRegistryCredentials[0].value() == 'test5'
+            verbose[0].value() == true
+            volumes[0].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].hostPath[0].value() == 'test6'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].path[0].value() == 'test7'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].hostPath[0].value() == 'test8'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].path[0].value() == 'test9'
+            privileged[0].value() == true
+            group[0].value() == 'test10'
+            command[0].value() == 'test11'
+        }
+        1 * mockJobManagement.requireMinimumPluginVersion('docker-custom-build-environment', '1.5.1')
+    }
+
+    def 'buildInDocker with image selector and all options'() {
+        when:
+        context.buildInDocker {
+            image('test1')
+            dockerHostURI('test3')
+            serverCredentials('test4')
+            registryCredentials('test5')
+            volume('test6', 'test7')
+            volume('test8', 'test9')
+            privilegedMode()
+            verbose()
+            userGroup('test10')
+            startCommand('test11')
+        }
+
+        then:
+        with(context.wrapperNodes[0]) {
+            name() == 'com.cloudbees.jenkins.plugins.okidocki.DockerBuildWrapper'
+            children().size() == 8
+            selector[0].children().size() == 1
+            selector[0].attribute('class') == 'com.cloudbees.jenkins.plugins.okidocki.PullDockerImageSelector'
+            selector[0].image[0].value() == 'test1'
+            dockerHost[0].children().size() == 2
+            dockerHost[0].uri[0].value() == 'test3'
+            dockerHost[0].credentialsId[0].value() == 'test4'
+            dockerRegistryCredentials[0].value() == 'test5'
+            verbose[0].value() == true
+            volumes[0].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].hostPath[0].value() == 'test6'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[0].path[0].value() == 'test7'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].children().size() == 2
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].hostPath[0].value() == 'test8'
+            volumes[0].'com.cloudbees.jenkins.plugins.okidocki.Volume'[1].path[0].value() == 'test9'
+            privileged[0].value() == true
+            group[0].value() == 'test10'
+            command[0].value() == 'test11'
+        }
+        1 * mockJobManagement.requireMinimumPluginVersion('docker-custom-build-environment', '1.5.1')
     }
 }

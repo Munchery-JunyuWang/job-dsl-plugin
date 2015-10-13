@@ -145,7 +145,7 @@ class JenkinsJobManagementSpec extends Specification {
 
     def 'requireMinimumCoreVersion failed'() {
         when:
-        jobManagement.requireMinimumCoreVersion('1.600')
+        jobManagement.requireMinimumCoreVersion('3.600')
 
         then:
         1 * build.setResult(UNSTABLE)
@@ -207,6 +207,14 @@ class JenkinsJobManagementSpec extends Specification {
 
         then:
         isXmlIdentical('extension.xml', result)
+    }
+
+    def 'callExtension with no value'() {
+        when:
+        Node result = jobManagement.callExtension('withNoValue', Mock(Item), StepContext)
+
+        then:
+        result == JobManagement.NO_VALUE
     }
 
     def 'extension is being notified'() {

@@ -4,6 +4,7 @@ import javaposse.jobdsl.dsl.AbstractContext
 import javaposse.jobdsl.dsl.ConfigFileType
 import javaposse.jobdsl.dsl.JobManagement
 import javaposse.jobdsl.dsl.Preconditions
+import javaposse.jobdsl.dsl.RequiresPlugin
 import javaposse.jobdsl.dsl.helpers.LocalRepositoryLocation
 
 class MavenContext extends AbstractContext {
@@ -15,6 +16,7 @@ class MavenContext extends AbstractContext {
     String mavenInstallation = '(Default)'
     Closure configureBlock
     String providedSettingsId
+    String providedGlobalSettingsId
 
     MavenContext(JobManagement jobManagement) {
         super(jobManagement)
@@ -30,7 +32,8 @@ class MavenContext extends AbstractContext {
     }
 
     /**
-     * Specifies the goals to execute.
+     * Specifies the goals to execute including other command line options.
+     * When specified multiple times, the goals and options will be concatenated.
      *
      * @param goals the goals to execute
      */
@@ -41,20 +44,16 @@ class MavenContext extends AbstractContext {
     /**
      * Specifies the JVM options needed when launching Maven as an external process.
      *
+     * When specified multiple times, the options will be concatenated.
+     *
      * @param mavenOpts JVM options needed when launching Maven
      */
     void mavenOpts(String mavenOpts) {
         this.mavenOpts << mavenOpts
     }
 
-    @Deprecated
-    void localRepository(javaposse.jobdsl.dsl.helpers.common.MavenContext.LocalRepositoryLocation location) {
-        jobManagement.logDeprecationWarning()
-        this.localRepositoryLocation = location.location
-    }
-
     /**
-     * Set to use isolated local Maven repositories.
+     * Set to use isolated local Maven repositories. Defaults to {@code LocalRepositoryLocation.LOCAL_TO_EXECUTOR}.
      *
      * @param location the local repository to use for isolation
      * @since 1.31
@@ -64,7 +63,7 @@ class MavenContext extends AbstractContext {
     }
 
     /**
-     * Specifies the Maven installation for executing this step or job.
+     * Specifies the Maven installation for executing this step.
      *
      * @param name name of the Maven installation to use
      */
@@ -78,6 +77,7 @@ class MavenContext extends AbstractContext {
      * @param settings name of the managed Maven settings
      * @since 1.25
      */
+    @RequiresPlugin(id = 'config-file-provider')
     void providedSettings(String settingsName) {
         String settingsId = jobManagement.getConfigFileId(ConfigFileType.MavenSettings, settingsName)
         Preconditions.checkNotNull(settingsId, "Managed Maven settings with name '${settingsName}' not found")
@@ -85,21 +85,45 @@ class MavenContext extends AbstractContext {
         this.providedSettingsId = settingsId
     }
 
+    /**
+     * Specifies the managed global Maven settings to be used.
+     *
+     * @param settings name of the managed global Maven settings
+     * @since 1.39
+     */
+    @RequiresPlugin(id = 'config-file-provider')
+    void providedGlobalSettings(String settingsName) {
+        String settingsId = jobManagement.getConfigFileId(ConfigFileType.GlobalMavenSettings, settingsName)
+        Preconditions.checkNotNull(settingsId, "Managed global Maven settings with name '${settingsName}' not found")
+
+        this.providedGlobalSettingsId = settingsId
+    }
+
+    /**
+     * Allows direct manipulation of the generated XML. The {@code hudson.tasks.Maven} node is passed into the configure
+     * block.
+     *
+     * @see <a href="https://github.com/jenkinsci/job-dsl-plugin/wiki/The-Configure-Block">The Configure Block</a>
+     */
     void configure(Closure closure) {
         this.configureBlock = closure
     }
 
     /**
+     * Adds properties for the Maven build.
+     *
      * @since 1.21
      */
     void properties(Map props) {
-        properties = properties + props
+        properties.putAll(props)
     }
 
     /**
+     * Adds a property for the Maven build.
+     *
      * @since 1.21
      */
     void property(String key, String value) {
-        properties = properties + [(key): value]
+        properties[key] = value
     }
 }

@@ -22,6 +22,9 @@ class S3BucketPublisherContext extends AbstractContext {
         super(jobManagement)
     }
 
+    /**
+     * Specifies files to upload. Can be called multiple times to add upload more files.
+     */
     void entry(String source, String bucketName, String region, @DslContext(S3EntryContext) Closure closure = null) {
         checkNotNullOrEmpty(source, 'source must be specified')
         checkNotNullOrEmpty(bucketName, 'bucket must be specified')
@@ -30,7 +33,7 @@ class S3BucketPublisherContext extends AbstractContext {
             checkArgument(REGIONS.contains(region), "region must be one of ${REGIONS.join(', ')}")
         }
 
-        S3EntryContext context = new S3EntryContext()
+        S3EntryContext context = new S3EntryContext(jobManagement)
         ContextHelper.executeInContext(closure, context)
 
         this.entries << NodeBuilder.newInstance().'hudson.plugins.s3.Entry' {
@@ -41,9 +44,17 @@ class S3BucketPublisherContext extends AbstractContext {
             noUploadOnFailure(context.noUploadOnFailure)
             uploadFromSlave(context.uploadFromSlave)
             managedArtifacts(context.managedArtifacts)
+
+            if (!jobManagement.getPluginVersion('s3')?.isOlderThan(new VersionNumber('0.7'))) {
+                useServerSideEncryption(context.useServerSideEncryption)
+                flatten(context.flatten)
+            }
         }
     }
 
+    /**
+     * Adds metadata for the upload files. Can be called multiple times to add more metadata.
+     */
     void metadata(String key, String value) {
         this.metadata << NodeBuilder.newInstance().'hudson.plugins.s3.MetadataPair' {
             delegate.key(key)

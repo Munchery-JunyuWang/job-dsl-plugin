@@ -1,7 +1,9 @@
 Welcome to the jenkins-job-dsl wiki!
 
-* The formal documentation and full syntax reference is detailed in [[Job DSL Commands]].
+* The high-level DSL concepts are documented in [[Job DSL Commands]].
+* See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/) for a full syntax reference
 * There are also tips on [[more advanced usage and workflows|User Power Moves]].
+* An introduction to the DSL can be found in a collection of [[Talks and Blog Posts]].
 * [The forum](https://groups.google.com/forum/#!forum/job-dsl-plugin) has lots of information, some of which is making its way to the [[FAQ|Frequently Asked Questions]].
 * If you want to get more involved, here's [how to contribute](https://github.com/jenkinsci/job-dsl-plugin/blob/master/CONTRIBUTING.md)...
 
@@ -16,9 +18,122 @@ If you want to get fancy you'll want to read up on [[configure block|The Configu
 Have a look at the [Jenkins Job DSL Gradle example](https://github.com/sheehan/job-dsl-gradle-example) to see how to organize a SCM repository for Job DSL scripts.
 
 ## Release Notes
-* 1.37 (unreleased)
+* 1.40 (unreleased)
+ * Increased the minimum supported Jenkins version to 1.609
+ * Added support for the
+   [Matrix Combinations Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Matrix+Combinations+Plugin)
+ * Enhanced support for the [GitHub Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+Plugin)
+   ([JENKINS-29849](https://issues.jenkins-ci.org/browse/JENKINS-29849))
+ * Enhanced support for [Maven Project Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Maven+Project+Plugin)
+   ([JENKINS-30544](https://issues.jenkins-ci.org/browse/JENKINS-30544))
  * Enhanced support for the [Multijob Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Multijob+Plugin)
+   ([JENKINS-30760](https://issues.jenkins-ci.org/browse/JENKINS-30760))
+ * Enhanced support for the
+   [GitHub Pull Request Builder Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+pull+request+builder+plugin)
+ * Fixed a problem with deprecation warnings
+   ([JENKINS-30826](https://issues.jenkins-ci.org/browse/JENKINS-30826))
+ * Allow `@DslExtensionMethod` annotated methods to return `null` to not contribute to the job configuration
+* 1.39 (October 05 2015)
+ * Increased the minimum supported Jenkins version to 1.596
+ * Added support for the [ZenTimestamp Plugin](https://wiki.jenkins-ci.org/display/JENKINS/ZenTimestamp+Plugin)
+ * Added support for the [CloudBees Docker Build and Publish
+   Plugin](https://wiki.jenkins-ci.org/display/JENKINS/CloudBees+Docker+Build+and+Publish+plugin)
+   ([JENKINS-29600](https://issues.jenkins-ci.org/browse/JENKINS-29600))
+ * Added support for remote trigger authentication token
+ * Added support for the [ArtifactDeployer Plugin](https://wiki.jenkins-ci.org/display/JENKINS/ArtifactDeployer+Plugin)
+ * Added support for the [CloudBees Docker Custom Build Environment
+   Plugin](https://wiki.jenkins-ci.org/display/JENKINS/CloudBees+Docker+Custom+Build+Environment+Plugin)
+ * Enhanced support for the [Subversion Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Subversion+Plugin)
+ * Enhanced support for the [xUnit Plugin](https://wiki.jenkins-ci.org/display/JENKINS/xUnit+Plugin)
+ * Enhanced support for the
+   [Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin)
+ * Enhanced support for the [vSphere Cloud Plugin](https://wiki.jenkins-ci.org/display/JENKINS/vSphere+Cloud+Plugin)
+ * Enhanced support for the [SonarQube Plugin](https://wiki.jenkins-ci.org/display/JENKINS/SonarQube+plugin)
+ * Enhanced support the
+   [Config File Provider Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Config+File+Provider+Plugin)
+   ([JENKINS-30493](https://issues.jenkins-ci.org/browse/JENKINS-30493))
+ * Changed support for the [Multijob Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Multijob+Plugin), see
+   [Migration](Migration#migrating-to-139)
+   ([JENKINS-27921](https://issues.jenkins-ci.org/browse/JENKINS-27921))
+ * Support for older versions of the [Subversion Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Subversion+Plugin)
+   is deprecated, see [Migration](Migration#migrating-to-139)
+ * Support for older versions of the
+   [Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin) is
+   deprecated, see [Migration](Migration#migrating-to-139)
+ * Support for the [JSHint Checkstyle Plugin](https://wiki.jenkins-ci.org/display/JENKINS/JSHint+Checkstyle+Plugin) is
+   deprecated, see [Migration](Migration#migrating-to-139)
+ * Fixed `StackOverflowError` when using `downstreamParameterized` publisher
+   ([JENKINS-30504](https://issues.jenkins-ci.org/browse/JENKINS-30504))
+ * Fixed problem with additional classpath
+   ([JENKINS-30348](https://issues.jenkins-ci.org/browse/JENKINS-30348))
+ * Allow to abort DSL processing
+ * Improved console output
+ * Added support for the [Cron Column Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Cron+Column+Plugin)
+ * Added support for the [Progress Bar Column Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Progress+Bar+Column+Plugin)
+ * Added support for the [Rebuild Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Rebuild+Plugin)
+ * Added support for the [Global Variable String Parameter Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Global+Variable+String+Parameter+Plugin)
+ * Added support for the [Phabricator Differential Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Phabricator+Differential+Plugin)
+ * The signature of `DslScriptLoader.runDslEngineForParent` has changed, see [Migration](Migration#migrating-to-139)
+ * Removed implicit star import of `javaposse.jobdsl.dsl.ConfigFileType` in scripts, see
+   [Migration](Migration#migrating-to-139)
+ * Removed anything that has been deprecated in 1.31, see [Migration](Migration#migrating-to-131)
+* 1.38 (September 09 2015)
+ * Replaced the [[Job Reference]], [[View Reference]] and [[Folder Reference]] pages by the
+   [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/)
+ * Added a collection of [[Talks and Blog Posts]]
+ * Added support for [Crittercism dSYM Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Crittercism+dSYM+Plugin)
+   ([JENKINS-29501](https://issues.jenkins-ci.org/browse/JENKINS-29501))
+ * Added support for the [ShiningPanda Plugin](https://wiki.jenkins-ci.org/display/JENKINS/ShiningPanda+Plugin)
+ * Enhanced support for the [Active Choices Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Active+Choices+Plugin)
+ * Enhanced support for the [Credentials Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Credentials+Plugin)
+ * Enhanced support for the
+   [GitHub Pull Request Builder Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+pull+request+builder+plugin)
+ * Enhanced support for the
+   [Delivery Pipeline Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Delivery+Pipeline+Plugin)
+   ([JENKINS-30221](https://issues.jenkins-ci.org/browse/JENKINS-30221))
+ * Enhanced support for the
+   [Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin)
+   ([JENKINS-29662](https://issues.jenkins-ci.org/browse/JENKINS-29662),
+   [JENKINS-29801](https://issues.jenkins-ci.org/browse/JENKINS-29801))
+ * Enhanced support for the [Parameterized Remote Trigger
+   Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Remote+Trigger+Plugin)
+   ([JENKINS-29531](https://issues.jenkins-ci.org/browse/JENKINS-29531))
+ * Enhanced support for the [S3 Plugin](https://wiki.jenkins-ci.org/display/JENKINS/S3+Plugin)
+ * Added documentation about [[handling credentials]]
+ * Fixed a problem with `ScmContext` and the extension point
+   ([JENKINS-29972](https://issues.jenkins-ci.org/browse/JENKINS-29972))
+ * Deprecated some overloaded DSL methods for the
+   [Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin), see
+   [Migration](Migration#migrating-to-138)
+ * Passing parameters to jobs has been changed, see [Migration](Migration#migrating-to-138)
+ * Support for older versions of the
+   [Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin) is
+   deprecated, see [Migration](Migration#migrating-to-138)
+ * Support for the older versions of the
+   [GitHub Pull Request Builder Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+pull+request+builder+plugin)
+   is deprecated, see [Migration](Migration#migrating-to-138)
+ * Increased the minimum supported Jenkins version to 1.580
+ * Increased the minimum required version of the [Config File Provider
+   Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Config+File+Provider+Plugin)
+   ([JENKINS-30013](https://issues.jenkins-ci.org/browse/JENKINS-30013))
+ * Added support for the [Ivy Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Ivy+Plugin)
+   ([JENKINS-29910](https://issues.jenkins-ci.org/browse/JENKINS-29910))
+ * Removed anything that has been deprecated in 1.30, see [Migration](Migration#migrating-to-130)
+* 1.37 (August 08 2015)
+ * Added support for the [Clang Scan Build Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Clang+Scan-Build+Plugin)
+   ([JENKINS-29505](https://issues.jenkins-ci.org/browse/JENKINS-29505))
+ * Enhanced support for the [Groovy Postbuild Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Groovy+Postbuild+Plugin)
+   ([JENKINS-29500](https://issues.jenkins-ci.org/browse/JENKINS-29500))
+ * Enhanced support for the [Multijob Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Multijob+Plugin)
+ * Enhanced support for the [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin)
+   ([JENKINS-29347](https://issues.jenkins-ci.org/browse/JENKINS-29347))
+ * Fixed problem with methods in build scripts
+   ([JENKINS-29862](https://issues.jenkins-ci.org/browse/JENKINS-29862))
  * Support for older versions of the [Multijob Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Multijob+Plugin)
+   is deprecated, see [Migration](Migration#migrating-to-137)
+ * Support for older versions of the [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin)
+   is deprecated, see [Migration](Migration#migrating-to-137)
+ * Support for older versions of the [Groovy Postbuild Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Groovy+Postbuild+Plugin)
    is deprecated, see [Migration](Migration#migrating-to-137)
 * 1.36 (August 06 2015)
  * Added support for the [Compress Build Log Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Compress+Build+Log+Plugin)

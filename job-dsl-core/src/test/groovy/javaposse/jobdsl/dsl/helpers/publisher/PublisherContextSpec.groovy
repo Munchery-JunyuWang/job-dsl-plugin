@@ -126,69 +126,42 @@ class PublisherContextSpec extends Specification {
     }
 
     def 'call archive artifacts with all args'() {
-        setup:
-        jobManagement.jenkinsVersion >> new VersionNumber('1.565')
-
         when:
         context.archiveArtifacts('include/*', 'exclude/*', true)
 
         then:
         with(context.publisherNodes[0]) {
             name() == 'hudson.tasks.ArtifactArchiver'
-            children().size() == 4
+            children().size() == 7
             artifacts[0].value() == 'include/*'
             excludes[0].value() == 'exclude/*'
             latestOnly[0].value() == true
             allowEmptyArchive[0].value() == false
+            fingerprint[0].value() == false
+            onlyIfSuccessful[0].value() == false
+            defaultExcludes[0].value() == true
         }
         2 * jobManagement.logDeprecationWarning()
     }
 
     def 'call archive artifacts least args'() {
-        setup:
-        jobManagement.jenkinsVersion >> new VersionNumber('1.565')
-
         when:
         context.archiveArtifacts('include/*')
 
         then:
         with(context.publisherNodes[0]) {
             name() == 'hudson.tasks.ArtifactArchiver'
-            children().size() == 3
+            children().size() == 6
             artifacts[0].value() == 'include/*'
             latestOnly[0].value() == false
             allowEmptyArchive[0].value() == false
+            fingerprint[0].value() == false
+            onlyIfSuccessful[0].value() == false
+            defaultExcludes[0].value() == true
         }
     }
 
     def 'call archive artifacts with closure'() {
-        setup:
-        jobManagement.jenkinsVersion >> new VersionNumber('1.565')
-
-        when:
-        context.archiveArtifacts {
-            pattern('include/*')
-            exclude('exclude/*')
-            allowEmpty()
-            latestOnly()
-        }
-
-        then:
-        with(context.publisherNodes[0]) {
-            name() == 'hudson.tasks.ArtifactArchiver'
-            children().size() == 4
-            artifacts[0].value() == 'include/*'
-            excludes[0].value() == 'exclude/*'
-            latestOnly[0].value() == true
-            allowEmptyArchive[0].value() == true
-        }
-        1 * jobManagement.logDeprecationWarning()
-    }
-
-    def 'call archive artifacts with closure and newer version of Jenkins'() {
-        setup:
-        jobManagement.jenkinsVersion >> new VersionNumber('1.580.2')
-
         when:
         context.archiveArtifacts {
             pattern('include/*')
@@ -212,16 +185,10 @@ class PublisherContextSpec extends Specification {
             onlyIfSuccessful[0].value() == true
             defaultExcludes[0].value() == false
         }
-        1 * jobManagement.requireMinimumCoreVersion('1.575')
-        1 * jobManagement.requireMinimumCoreVersion('1.571')
-        1 * jobManagement.requireMinimumCoreVersion('1.567')
         1 * jobManagement.logDeprecationWarning()
     }
 
     def 'call archive artifacts with multiple patterns'() {
-        setup:
-        jobManagement.jenkinsVersion >> new VersionNumber('1.565')
-
         when:
         context.archiveArtifacts {
             pattern('include1/*')
@@ -231,10 +198,13 @@ class PublisherContextSpec extends Specification {
         then:
         with(context.publisherNodes[0]) {
             name() == 'hudson.tasks.ArtifactArchiver'
-            children().size() == 3
+            children().size() == 6
             artifacts[0].value() == 'include1/*,include2/*'
             latestOnly[0].value() == false
             allowEmptyArchive[0].value() == false
+            fingerprint[0].value() == false
+            onlyIfSuccessful[0].value() == false
+            defaultExcludes[0].value() == true
         }
     }
 
@@ -456,6 +426,7 @@ class PublisherContextSpec extends Specification {
         'qTestLib'   | 'QTestLibType'
         'unitTest'   | 'UnitTestJunitHudsonTestType'
         'valgrind'   | 'ValgrindJunitHudsonTestType'
+        'xUnitDotNET'   | 'XUnitDotNetTestType'
     }
 
     def 'call archiveXUnit with combination of most options'() {
@@ -811,32 +782,6 @@ class PublisherContextSpec extends Specification {
         1 * jobManagement.requirePlugin('jabber')
     }
 
-    def 'call Jabber publish with all args'() {
-        when:
-        context.publishJabber('me@gmail.com *tools@hipchat.com', 'ANY_FAILURE', 'SummaryOnly')
-
-        then:
-        Node publisherNode = context.publisherNodes[0]
-        publisherNode.name() == 'hudson.plugins.jabber.im.transport.JabberPublisher'
-        publisherNode.targets[0].'hudson.plugins.im.DefaultIMMessageTarget'.size() == 1
-        publisherNode.targets[0].'hudson.plugins.im.GroupChatIMMessageTarget'.size() == 1
-
-        def confTargetNode = publisherNode.targets[0].'hudson.plugins.im.GroupChatIMMessageTarget'[0]
-        confTargetNode.name[0].value() == 'tools@hipchat.com'
-        confTargetNode.notificationOnly[0].value() == 'false'
-
-        def emailTargetNode = publisherNode.targets[0].'hudson.plugins.im.DefaultIMMessageTarget'[0]
-        emailTargetNode.value[0].value() == 'me@gmail.com'
-        emailTargetNode.notificationOnly.size() == 0
-
-        publisherNode.strategy[0].value() == 'ANY_FAILURE'
-        Node buildToNode = publisherNode.buildToChatNotifier[0]
-        buildToNode.attributes().containsKey('class')
-        buildToNode.attribute('class') == 'hudson.plugins.im.build_notify.SummaryOnlyBuildToChatNotifier'
-
-        1 * jobManagement.requirePlugin('jabber')
-    }
-
     def 'call Jabber publish with closure args'() {
         when:
         context.publishJabber('me@gmail.com') {
@@ -868,18 +813,30 @@ class PublisherContextSpec extends Specification {
         1 * jobManagement.requirePlugin('jabber')
     }
 
-    def 'call Jabber publish to get exceptions'() {
+    def 'call Jabber publish with invalid strategy'() {
         when:
-        context.publishJabber('me@gmail.com', 'NOPE')
+        context.publishJabber('me@gmail.com') {
+            strategyName(strategy)
+        }
 
         then:
         thrown(DslScriptException)
 
+        where:
+        strategy << [null, '', 'NOPE']
+    }
+
+    def 'call Jabber publish with invalid channel notification name'() {
         when:
-        context.publishJabber('me@gmail.com', 'ALL', 'Nope')
+        context.publishJabber('me@gmail.com') {
+            channelNotificationName(name)
+        }
 
         then:
         thrown(DslScriptException)
+
+        where:
+        name << [null, '', 'NOPE']
     }
 
     def 'call Clone Workspace publish with minimal args'() {
@@ -943,7 +900,7 @@ class PublisherContextSpec extends Specification {
         publisherNode.criteria[0].value() == 'Not Failed'
         publisherNode.archiveMethod[0].value() == 'ZIP'
         publisherNode.overrideDefaultExcludes[0].value() == true
-        1 * jobManagement.requirePlugin('clone-workspace-scm')
+        (1.._) * jobManagement.requirePlugin('clone-workspace-scm')
     }
 
     def 'call scp publish with not enough entries'() {
@@ -1045,8 +1002,21 @@ class PublisherContextSpec extends Specification {
         publisherNode.threshold[0].color[0].value() == 'BLUE'
     }
 
+    def 'call trigger downstream with project list'() {
+        when:
+        context.downstream(['job1', 'job2'])
+
+        then:
+        Node publisherNode = context.publisherNodes[0]
+        publisherNode.name() == 'hudson.tasks.BuildTrigger'
+        publisherNode.childProjects[0].value() == 'job1, job2'
+        publisherNode.threshold[0].name[0].value() == 'SUCCESS'
+        publisherNode.threshold[0].ordinal[0].value() == 0
+        publisherNode.threshold[0].color[0].value() == 'BLUE'
+    }
+
     def 'call trigger downstream'() {
-            when:
+        when:
         context.downstream('THE-JOB', 'FAILURE')
 
         then:
@@ -1066,7 +1036,7 @@ class PublisherContextSpec extends Specification {
         thrown(DslScriptException)
     }
 
-    def 'call downstream ext with all args'() {
+    def 'call downstream ext with all args with deprecated methods'() {
         when:
         context.downstreamParameterized {
             trigger('Project1, Project2', 'UNSTABLE_OR_BETTER', true) {
@@ -1139,6 +1109,8 @@ class PublisherContextSpec extends Specification {
         second.configs[0].'hudson.plugins.parameterizedtrigger.CurrentBuildParameters'[0] instanceof Node
 
         1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
 
         when:
         context.downstreamParameterized {
@@ -1153,10 +1125,169 @@ class PublisherContextSpec extends Specification {
         third.triggerWithNoParameters[0].value() == false
         third.configs[0].attribute('class') == 'java.util.Collections$EmptyList'
         1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
 
         when:
         context.downstreamParameterized {
             trigger('Project4', 'WRONG')
+        }
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'call downstream ext with all args'() {
+        when:
+        context.downstreamParameterized {
+            trigger('Project1, Project2') {
+                condition('UNSTABLE_OR_BETTER')
+                triggerWithNoParameters()
+                parameters {
+                    currentBuild()
+                    propertiesFile('dir/my.properties')
+                    gitRevision(false)
+                    predefinedProp('key1', 'value1')
+                    predefinedProps([key2: 'value2', key3: 'value3'])
+                    matrixSubset('label=="${TARGET}"')
+                    subversionRevision()
+                    booleanParam('aParam')
+                    booleanParam('bParam', false)
+                    booleanParam('cParam', true)
+                    sameNode()
+                    nodeLabel('nodeParam', 'node_label')
+                }
+            }
+            trigger('Project2') {
+                parameters {
+                    currentBuild()
+                }
+            }
+        }
+
+        then:
+        Node publisherNode = context.publisherNodes[0]
+        publisherNode.name() == 'hudson.plugins.parameterizedtrigger.BuildTrigger'
+        publisherNode.configs[0].children().size() == 2
+        with(publisherNode.configs[0].'hudson.plugins.parameterizedtrigger.BuildTriggerConfig'[0]) {
+            projects[0].value() == 'Project1, Project2'
+            condition[0].value() == 'UNSTABLE_OR_BETTER'
+            triggerWithNoParameters[0].value() == true
+            configs[0].'hudson.plugins.parameterizedtrigger.CurrentBuildParameters'[0] instanceof Node
+            configs[0].'hudson.plugins.parameterizedtrigger.FileBuildParameters'[0].propertiesFile[0].value() ==
+                    'dir/my.properties'
+            configs[0].'hudson.plugins.git.GitRevisionBuildParameters'[0].combineQueuedCommits[0].value() == false
+            configs[0].'hudson.plugins.parameterizedtrigger.PredefinedBuildParameters'.size() == 1
+            configs[0].'hudson.plugins.parameterizedtrigger.PredefinedBuildParameters'[0].'properties'[0].value() ==
+                    'key1=value1\nkey2=value2\nkey3=value3'
+            configs[0].'hudson.plugins.parameterizedtrigger.matrix.MatrixSubsetBuildParameters'[0].filter[0].value() ==
+                    'label=="${TARGET}"'
+            configs[0].'hudson.plugins.parameterizedtrigger.SubversionRevisionBuildParameters'[0] instanceof Node
+            block.size() == 0
+
+            def boolParams = configs[0].'hudson.plugins.parameterizedtrigger.BooleanParameters'[0].configs[0]
+            boolParams.children().size() == 3
+            def boolNode = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[0]
+            boolNode.name[0].value() == 'aParam'
+            boolNode.value[0].value() == false
+            def boolNode1 = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[1]
+            boolNode1.name[0].value() == 'bParam'
+            boolNode1.value[0].value() == false
+            def boolNode2 = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[2]
+            boolNode2.name[0].value() == 'cParam'
+            boolNode2.value[0].value() == true
+
+            def nodeNode = configs[0].'hudson.plugins.parameterizedtrigger.NodeParameters'[0]
+            nodeNode != null
+
+            def nodeLabel = configs[0].
+            'org.jvnet.jenkins.plugins.nodelabelparameter.parameterizedtrigger.NodeLabelBuildParameter'[0]
+            nodeLabel.name[0].value() == 'nodeParam'
+            nodeLabel.nodeLabel[0].value() == 'node_label'
+
+            block.isEmpty()
+        }
+
+        Node second = publisherNode.configs[0].'hudson.plugins.parameterizedtrigger.BuildTriggerConfig'[1]
+        second.projects[0].value() == 'Project2'
+        second.condition[0].value() == 'SUCCESS'
+        second.triggerWithNoParameters[0].value() == false
+        second.configs[0].'hudson.plugins.parameterizedtrigger.CurrentBuildParameters'[0] instanceof Node
+
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
+
+        when:
+        context.downstreamParameterized {
+            trigger('Project3') {
+            }
+        }
+
+        then:
+        Node third = context.publisherNodes[1].configs[0].'hudson.plugins.parameterizedtrigger.BuildTriggerConfig'[0]
+        third.projects[0].value() == 'Project3'
+        third.condition[0].value() == 'SUCCESS'
+        third.triggerWithNoParameters[0].value() == false
+        third.configs[0].attribute('class') == 'java.util.Collections$EmptyList'
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
+
+        when:
+        context.downstreamParameterized {
+            trigger('Project4', 'WRONG')
+        }
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'call parametrized downstream with project list'() {
+        when:
+        context.downstreamParameterized {
+            trigger(['Project1', 'Project2']) {
+            }
+        }
+
+        then:
+        Node third = context.publisherNodes[0].configs[0].'hudson.plugins.parameterizedtrigger.BuildTriggerConfig'[0]
+        third.projects[0].value() == 'Project1, Project2'
+        third.condition[0].value() == 'SUCCESS'
+        third.triggerWithNoParameters[0].value() == false
+        third.configs[0].attribute('class') == 'java.util.Collections$EmptyList'
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
+    }
+
+    def 'call parametrized downstream with FAILED_OR_BETTER condition'() {
+        given:
+        jobManagement.getPluginVersion('parameterized-trigger') >> new VersionNumber('2.26')
+
+        when:
+        context.downstreamParameterized {
+            trigger('Project1') {
+                condition('FAILED_OR_BETTER')
+            }
+        }
+
+        then:
+        Node third = context.publisherNodes[0].configs[0].'hudson.plugins.parameterizedtrigger.BuildTriggerConfig'[0]
+        third.projects[0].value() == 'Project1'
+        third.condition[0].value() == 'FAILED_OR_BETTER'
+        third.triggerWithNoParameters[0].value() == false
+        third.configs[0].attribute('class') == 'java.util.Collections$EmptyList'
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
+    }
+
+    def 'call parametrized downstream with FAILED_OR_BETTER condition and older plugin version'() {
+        given:
+        jobManagement.getPluginVersion('parameterized-trigger') >> new VersionNumber('2.25')
+
+        when:
+        context.downstreamParameterized {
+            trigger('Project1') {
+                condition('FAILED_OR_BETTER')
+            }
         }
 
         then:
@@ -1184,7 +1315,7 @@ class PublisherContextSpec extends Specification {
         typeConfigNode.unstable[0].value() == '999'
         typeConfigNode.usePattern[0].value() == 'false'
         typeConfigNode.pattern[0].value() == ''
-        1 * jobManagement.requirePlugin('violations')
+        (1.._) * jobManagement.requirePlugin('violations')
     }
 
     def 'call violations plugin with all args'() {
@@ -1239,16 +1370,6 @@ class PublisherContextSpec extends Specification {
         jslintNode.'hudson.plugins.violations.TypeConfig'[0].usePattern[0].value() == 'false'
         jslintNode.'hudson.plugins.violations.TypeConfig'[0].pattern[0].value() == ''
         1 * jobManagement.requirePlugin('violations')
-    }
-
-    def 'call violations plugin with bad types'() {
-        when:
-        context.violations {
-            badType 10
-        }
-
-        then:
-        thrown(IllegalArgumentException)
     }
 
     def 'cordell walker constructs xml'() {
@@ -1471,36 +1592,41 @@ class PublisherContextSpec extends Specification {
         context.cobertura('reportfilename') {
             target('invalid', 1, 2, 3)
         }
+
         then:
         thrown(DslScriptException)
     }
 
     def 'checking for invalid cobertura target treshold: negative'() {
         when:
-            context.cobertura('reportfilename') {
-                target('invalid', h, u, f)
-            }
+        context.cobertura('reportfilename') {
+            target('invalid', h, u, f)
+        }
+
         then:
-            thrown(DslScriptException)
+        thrown(DslScriptException)
+
         where:
-            h  |  u |  f
-            -1 |  1 |  1
-            1  | -1 |  1
-            1  |  1 | -1
+        h  | u  | f
+        -1 | 1  | 1
+        1  | -1 | 1
+        1  | 1  | -1
     }
 
     def 'checking for invalid cobertura target treshold: more than 100 percent'() {
         when:
-            context.cobertura('reportfilename') {
-                target('invalid', h, u, f)
-            }
+        context.cobertura('reportfilename') {
+            target('invalid', h, u, f)
+        }
+
         then:
-            thrown(DslScriptException)
+        thrown(DslScriptException)
+
         where:
-            h  |  u  |  f
-           101 |  1  |  1
-            1  | 101 |  1
-            1  |  1  | 101
+        h   | u   | f
+        101 | 1   | 1
+        1   | 101 | 1
+        1   | 1   | 101
     }
 
     def 'null source encoding for cobertura'() {
@@ -1791,28 +1917,90 @@ class PublisherContextSpec extends Specification {
         aggregateNode.includeFailedBuilds[0].value() == true
     }
 
-    def 'call groovyPostBuild'() {
+    def 'call groovyPostBuild with older plugin version'() {
+        setup:
+        jobManagement.getPluginVersion('groovy-postbuild') >> new VersionNumber('1.10')
+
         when:
         context.groovyPostBuild('foo')
 
         then:
-        context.publisherNodes.size() == 1
-        context.publisherNodes[0].name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
-        context.publisherNodes[0].groovyScript[0].value() == 'foo'
-        context.publisherNodes[0].behavior[0].value() == 0
-        1 * jobManagement.requirePlugin('groovy-postbuild')
+        with(context.publisherNodes[0]) {
+            name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
+            children().size() == 2
+            groovyScript[0].value() == 'foo'
+            behavior[0].value() == 0
+        }
+        (1.._) * jobManagement.requirePlugin('groovy-postbuild')
+        1 * jobManagement.logPluginDeprecationWarning('groovy-postbuild', '2.2')
     }
 
-    def 'call groovyPostBuild with overriden failure behavior'() {
+    def 'call groovyPostBuild with overriden failure behavior and older plugin version'() {
+        setup:
+        jobManagement.getPluginVersion('groovy-postbuild') >> new VersionNumber('1.10')
+
         when:
         context.groovyPostBuild('foo', MarkUnstable)
 
         then:
-        context.publisherNodes.size() == 1
-        context.publisherNodes[0].name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
-        context.publisherNodes[0].groovyScript[0].value() == 'foo'
-        context.publisherNodes[0].behavior[0].value() == 1
+        with(context.publisherNodes[0]) {
+            name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
+            children().size() == 2
+            groovyScript[0].value() == 'foo'
+            behavior[0].value() == 1
+        }
+        (1.._) * jobManagement.requirePlugin('groovy-postbuild')
+        1 * jobManagement.logPluginDeprecationWarning('groovy-postbuild', '2.2')
+    }
+
+    def 'call groovyPostBuild with no options and newer plugin version'() {
+        setup:
+        jobManagement.getPluginVersion('groovy-postbuild') >> new VersionNumber('2.2')
+
+        when:
+        context.groovyPostBuild {
+        }
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
+            children().size() == 2
+            with(script[0]) {
+                children().size() == 2
+                script[0].value() == ''
+                sandbox[0].value() == false
+            }
+            behavior[0].value() == 0
+        }
         1 * jobManagement.requirePlugin('groovy-postbuild')
+        1 * jobManagement.logPluginDeprecationWarning('groovy-postbuild', '2.2')
+    }
+
+    def 'call groovyPostBuild with all options and newer plugin version'() {
+        setup:
+        jobManagement.getPluginVersion('groovy-postbuild') >> new VersionNumber('2.2')
+
+        when:
+        context.groovyPostBuild {
+            script('foo')
+            behavior(PublisherContext.Behavior.MarkFailed)
+            sandbox()
+        }
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder'
+            children().size() == 2
+            with(script[0]) {
+                children().size() == 2
+                script[0].value() == 'foo'
+                sandbox[0].value() == true
+            }
+            behavior[0].value() == 2
+        }
+        1 * jobManagement.requirePlugin('groovy-postbuild')
+        1 * jobManagement.requireMinimumPluginVersion('groovy-postbuild', '2.2')
+        1 * jobManagement.logPluginDeprecationWarning('groovy-postbuild', '2.2')
     }
 
     def 'call javadoc archiver with no args'() {
@@ -2118,6 +2306,8 @@ class PublisherContextSpec extends Specification {
             configs[0].value().empty
         }
         1 * jobManagement.requirePlugin('build-pipeline-plugin')
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
     }
 
     def 'call buildPipelineTrigger with parameters'() {
@@ -2145,6 +2335,8 @@ class PublisherContextSpec extends Specification {
                     'key1=value1'
         }
         1 * jobManagement.requirePlugin('build-pipeline-plugin')
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
     }
 
     def 'call buildPipelineTrigger with null argument'() {
@@ -2189,6 +2381,7 @@ class PublisherContextSpec extends Specification {
         context.publisherNodes[0].pushOnlyIfSuccess[0].value() == false
         context.publisherNodes[0].forcePush[0].value() == false
         1 * jobManagement.requirePlugin('git')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
     }
 
     def 'call git with minimal options pre 2.2.6'() {
@@ -2207,6 +2400,7 @@ class PublisherContextSpec extends Specification {
         context.publisherNodes[0].pushMerge[0].value() == false
         context.publisherNodes[0].pushOnlyIfSuccess[0].value() == false
         1 * jobManagement.requirePlugin('git')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
     }
 
     def 'call git with all options'() {
@@ -2248,6 +2442,7 @@ class PublisherContextSpec extends Specification {
             }
         }
         1 * jobManagement.requirePlugin('git')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
     }
 
     def 'call git with minimal tag options'() {
@@ -2275,6 +2470,7 @@ class PublisherContextSpec extends Specification {
             }
         }
         1 * jobManagement.requirePlugin('git')
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
     }
 
     def 'call git without tag targetRepoName'() {
@@ -2636,7 +2832,7 @@ class PublisherContextSpec extends Specification {
                 entry[5].boolean[0].value() == false
             }
         }
-        1 * jobManagement.requirePlugin('jenkins-flowdock-plugin')
+        (1.._) * jobManagement.requirePlugin('jenkins-flowdock-plugin')
     }
 
     def 'flowdock with no tokens'() {
@@ -2938,6 +3134,9 @@ class PublisherContextSpec extends Specification {
     }
 
     def 'call s3 with some options'() {
+        setup:
+        jobManagement.getPluginVersion('s3') >> new VersionNumber('0.7')
+
         when:
         context.s3('profile') {
             entry('foo', 'bar', 'us-east-1')
@@ -2953,7 +3152,7 @@ class PublisherContextSpec extends Specification {
             entries.size() == 1
             entries[0].'hudson.plugins.s3.Entry'.size() == 1
             with(entries[0].'hudson.plugins.s3.Entry'[0]) {
-                children().size() == 7
+                children().size() == 9
                 sourceFile[0].value() == 'foo'
                 bucket[0].value() == 'bar'
                 storageClass[0].value() == 'STANDARD'
@@ -2961,6 +3160,8 @@ class PublisherContextSpec extends Specification {
                 noUploadOnFailure[0].value() == false
                 uploadFromSlave[0].value() == false
                 managedArtifacts[0].value() == false
+                useServerSideEncryption[0].value() == false
+                flatten[0].value() == false
             }
             userMetadata.size() == 1
             userMetadata[0].'hudson.plugins.s3.MetadataPair'.size() == 1
@@ -2974,6 +3175,9 @@ class PublisherContextSpec extends Specification {
     }
 
     def 'call s3 with more options'() {
+        setup:
+        jobManagement.getPluginVersion('s3') >> new VersionNumber('0.7')
+
         when:
         context.s3('profile') {
             entry('foo', 'bar', 'eu-west-1')
@@ -2982,6 +3186,8 @@ class PublisherContextSpec extends Specification {
                 noUploadOnFailure(true)
                 uploadFromSlave(true)
                 managedArtifacts(true)
+                useServerSideEncryption(true)
+                flatten(true)
             }
             metadata('key', 'value')
         }
@@ -2995,7 +3201,7 @@ class PublisherContextSpec extends Specification {
             entries.size() == 1
             entries[0].'hudson.plugins.s3.Entry'.size() == 2
             with(entries[0].'hudson.plugins.s3.Entry'[0]) {
-                children().size() == 7
+                children().size() == 9
                 sourceFile[0].value() == 'foo'
                 bucket[0].value() == 'bar'
                 storageClass[0].value() == 'STANDARD'
@@ -3003,9 +3209,11 @@ class PublisherContextSpec extends Specification {
                 noUploadOnFailure[0].value() == false
                 uploadFromSlave[0].value() == false
                 managedArtifacts[0].value() == false
+                useServerSideEncryption[0].value() == false
+                flatten[0].value() == false
             }
             with(entries[0].'hudson.plugins.s3.Entry'[1]) {
-                children().size() == 7
+                children().size() == 9
                 sourceFile[0].value() == 'bar'
                 bucket[0].value() == 'baz'
                 storageClass[0].value() == 'REDUCED_REDUNDANCY'
@@ -3013,6 +3221,8 @@ class PublisherContextSpec extends Specification {
                 noUploadOnFailure[0].value() == true
                 uploadFromSlave[0].value() == true
                 managedArtifacts[0].value() == true
+                useServerSideEncryption[0].value() == true
+                flatten[0].value() == true
             }
             userMetadata.size() == 1
             userMetadata[0].'hudson.plugins.s3.MetadataPair'.size() == 1
@@ -3298,6 +3508,7 @@ class PublisherContextSpec extends Specification {
         when:
         context.sonar {
             branch('test')
+            additionalProperties('-Dtest=test')
             overrideTriggers {
                 skipIfEnvironmentVariable('FOO')
             }
@@ -3311,7 +3522,7 @@ class PublisherContextSpec extends Specification {
             branch[0].value() == 'test'
             language[0].value().empty
             mavenOpts[0].value().empty
-            jobAdditionalProperties[0].value().empty
+            jobAdditionalProperties[0].value() == '-Dtest=test'
             mavenInstallationName[0].value() == '(Inherit From Job)'
             rootPom[0].value().empty
             settings[0].value().empty
@@ -4129,12 +4340,16 @@ class PublisherContextSpec extends Specification {
         then:
         with(context.publisherNodes[0]) {
             name() == 'org.jenkinsci.plugins.ghprb.GhprbPullRequestMerge'
-            children().size() == 4
+            children().size() == 6
             mergeComment[0].value() == ''
             onlyTriggerPhrase[0].value() == false
             onlyAdminsMerge[0].value() == false
             disallowOwnCode[0].value() == false
+            failOnNonMerge[0].value() == false
+            deleteOnMerge[0].value() == false
         }
+        1 * jobManagement.requireMinimumPluginVersion('ghprb', '1.17')
+        1 * jobManagement.logPluginDeprecationWarning('ghprb', '1.26')
     }
 
     def 'mergePullRequest with all options'() {
@@ -4144,17 +4359,44 @@ class PublisherContextSpec extends Specification {
             onlyTriggerPhrase()
             onlyAdminsMerge()
             disallowOwnCode()
+            failOnNonMerge()
+            deleteOnMerge()
         }
 
         then:
         with(context.publisherNodes[0]) {
             name() == 'org.jenkinsci.plugins.ghprb.GhprbPullRequestMerge'
-            children().size() == 4
+            children().size() == 6
             mergeComment[0].value() == 'Test comment'
             onlyTriggerPhrase[0].value() == true
             onlyAdminsMerge[0].value() == true
             disallowOwnCode[0].value() == true
+            failOnNonMerge[0].value() == true
+            deleteOnMerge[0].value() == true
         }
+        1 * jobManagement.requireMinimumPluginVersion('ghprb', '1.17')
+        2 * jobManagement.requireMinimumPluginVersion('ghprb', '1.26')
+        1 * jobManagement.logPluginDeprecationWarning('ghprb', '1.26')
+    }
+
+    def 'mergePullRequest with no options and older plugin version'() {
+        setup:
+        jobManagement.getPluginVersion('ghprb') >> new VersionNumber('1.25')
+
+        when:
+        context.mergePullRequest()
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'org.jenkinsci.plugins.ghprb.GhprbPullRequestMerge'
+            children().size() == 4
+            mergeComment[0].value() == ''
+            onlyTriggerPhrase[0].value() == false
+            onlyAdminsMerge[0].value() == false
+            disallowOwnCode[0].value() == false
+        }
+        1 * jobManagement.requireMinimumPluginVersion('ghprb', '1.17')
+        1 * jobManagement.logPluginDeprecationWarning('ghprb', '1.26')
     }
 
     def 'publishBuild with no options'() {
@@ -4169,6 +4411,49 @@ class PublisherContextSpec extends Specification {
             publishFailedBuilds[0].value() == true
         }
         1 * jobManagement.requireMinimumPluginVersion('build-publisher', '1.20')
+    }
+
+    def 'phabricatorNotifier with no options'() {
+        when:
+        context.phabricatorNotifier()
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'com.uber.jenkins.phabricator.PhabricatorNotifier'
+            children().size() == 6
+            commentOnSuccess[0].value() == false
+            commentWithConsoleLinkOnFailure[0].value() == false
+            commentFile[0].value() == '.phabricator-comment'
+            commentSize[0].value() == 1000
+            preserveFormatting[0].value() == false
+            uberallsEnabled[0].value() == true
+        }
+        1 * jobManagement.requireMinimumPluginVersion('phabricator-plugin', '1.8.1')
+    }
+
+    def 'phabricatorNotifier with all options'() {
+        when:
+        context.phabricatorNotifier {
+            commentOnSuccess()
+            commentWithConsoleLinkOnFailure()
+            commentFile('.my-comment-file')
+            commentSize(2000)
+            preserveFormatting()
+            enableUberalls(false)
+        }
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'com.uber.jenkins.phabricator.PhabricatorNotifier'
+            children().size() == 6
+            commentOnSuccess[0].value() == true
+            commentWithConsoleLinkOnFailure[0].value() == true
+            commentFile[0].value() == '.my-comment-file'
+            commentSize[0].value() == 2000
+            preserveFormatting[0].value() == true
+            uberallsEnabled[0].value() == false
+        }
+        1 * jobManagement.requireMinimumPluginVersion('phabricator-plugin', '1.8.1')
     }
 
     def 'publishBuild with all options'() {
@@ -4475,6 +4760,41 @@ class PublisherContextSpec extends Specification {
         1 * jobManagement.requireMinimumPluginVersion('publish-over-ssh', '1.12')
     }
 
+    def 'crittercismDsymUpload with no options'() {
+        when:
+        context.crittercismDsymUpload {
+        }
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'org.jenkinsci.plugins.crittercism__dsym.CrittercismDsymRecorder'
+            children().size() == 3
+            apiKey[0].value() == ''
+            appID[0].value() == ''
+            filePath[0].value() == ''
+        }
+        1 * jobManagement.requireMinimumPluginVersion('crittercism-dsym', '1.1')
+    }
+
+    def 'crittercismDsymUpload with all options'() {
+        when:
+        context.crittercismDsymUpload {
+            apiKey('theKey')
+            appID('theId')
+            filePath('thePath')
+        }
+
+        then:
+        with(context.publisherNodes[0]) {
+            name() == 'org.jenkinsci.plugins.crittercism__dsym.CrittercismDsymRecorder'
+            children().size() == 3
+            apiKey[0].value() == 'theKey'
+            appID[0].value() == 'theId'
+            filePath[0].value() == 'thePath'
+        }
+        1 * jobManagement.requireMinimumPluginVersion('crittercism-dsym', '1.1')
+    }
+
     def 'joinTrigger with no options'() {
         when:
         context.joinTrigger {
@@ -4647,5 +4967,79 @@ class PublisherContextSpec extends Specification {
         message                       | commit
         ''                            | false
         'automatic commit by Jenkins' | true
+    }
+
+    def 'call artifactDeployer with no options'() {
+        when:
+        context.artifactDeployer {
+        }
+
+        then:
+        context.publisherNodes.size() == 1
+        with(context.publisherNodes[0]) {
+            name() == 'org.jenkinsci.plugins.artifactdeployer.ArtifactDeployerPublisher'
+            children().size() == 2
+            deployEvenBuildFail[0].value() == false
+            entries[0].value().empty
+        }
+        1 * jobManagement.requireMinimumPluginVersion('artifactdeployer', '0.33')
+    }
+
+    def 'call artifactDeployer with all options'() {
+        when:
+        context.artifactDeployer {
+            artifactsToDeploy {
+                includes('test1')
+                baseDir('test2')
+                remoteFileLocation('test3')
+                excludes('test4')
+                flatten()
+                cleanUp()
+                deleteRemoteArtifacts()
+                deleteRemoteArtifactsByScript('test5')
+                failIfNoFiles()
+            }
+            artifactsToDeploy {}
+            deployIfFailed()
+        }
+
+        then:
+        context.publisherNodes.size() == 1
+        with(context.publisherNodes[0]) {
+            name() == 'org.jenkinsci.plugins.artifactdeployer.ArtifactDeployerPublisher'
+            children().size() == 2
+            deployEvenBuildFail[0].value() == true
+            with(entries[0]) {
+                children().size() == 2
+                with(children()[0]) {
+                    name() == 'org.jenkinsci.plugins.artifactdeployer.ArtifactDeployerEntry'
+                    children().size() == 10
+                    includes[0].value() == 'test1'
+                    basedir[0].value() == 'test2'
+                    remote[0].value() == 'test3'
+                    excludes[0].value() == 'test4'
+                    flatten[0].value() == true
+                    deleteRemote[0].value() == true
+                    deleteRemoteArtifacts[0].value() == true
+                    deleteRemoteArtifactsByScript[0].value() == true
+                    groovyExpression[0].value() == 'test5'
+                    failNoFilesDeploy[0].value() == true
+                }
+                with(children()[1]) {
+                    name() == 'org.jenkinsci.plugins.artifactdeployer.ArtifactDeployerEntry'
+                    children().size() == 9
+                    includes[0].value().empty
+                    basedir[0].value().empty
+                    remote[0].value().empty
+                    excludes[0].value().empty
+                    flatten[0].value() == false
+                    deleteRemote[0].value() == false
+                    deleteRemoteArtifacts[0].value() == false
+                    deleteRemoteArtifactsByScript[0].value() == false
+                    failNoFilesDeploy[0].value() == false
+                }
+            }
+        }
+        1 * jobManagement.requireMinimumPluginVersion('artifactdeployer', '0.33')
     }
 }

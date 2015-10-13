@@ -1,5 +1,6 @@
 package javaposse.jobdsl.dsl.helpers
 
+import hudson.util.VersionNumber
 import javaposse.jobdsl.dsl.DslScriptException
 import javaposse.jobdsl.dsl.JobManagement
 import spock.lang.Specification
@@ -100,6 +101,7 @@ class BuildParametersContextSpec extends Specification {
         context.buildParameterNodes.size() == 1
         with(context.buildParameterNodes['myParameterName']) {
             name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
             name.text() == 'myParameterName'
             defaultValue.text() == 'theDefaultValue'
             tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
@@ -108,8 +110,38 @@ class BuildParametersContextSpec extends Specification {
             reverseByName.text() == 'true'
             maxTags.text() == 'maximumNumberOfTagsToDisplay'
             description.text() == 'myListTagsParameterDescription'
+            credentialsId.text().empty
+            !uuid.text().empty
         }
-        1 * jobManagement.requirePlugin('subversion')
+        (1.._) * jobManagement.requirePlugin('subversion')
+    }
+
+    def 'base listTagsParam usage with older plugin version'() {
+        given:
+        jobManagement.getPluginVersion('subversion') >> new VersionNumber('2.0')
+
+        when:
+        context.listTagsParam('myParameterName', 'http://kenai.com/svn/myProject/tags', '^mytagsfilterregex', true,
+                true, 'maximumNumberOfTagsToDisplay', 'theDefaultValue', 'myListTagsParameterDescription')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['myParameterName']) {
+            name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 9
+            name.text() == 'myParameterName'
+            defaultValue.text() == 'theDefaultValue'
+            tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
+            tagsFilter.text() == '^mytagsfilterregex'
+            reverseByDate.text() == 'true'
+            reverseByName.text() == 'true'
+            maxTags.text() == 'maximumNumberOfTagsToDisplay'
+            description.text() == 'myListTagsParameterDescription'
+            !uuid.text().empty
+        }
+        (1.._) * jobManagement.requirePlugin('subversion')
+        1 * jobManagement.logPluginDeprecationWarning('subversion', '2.1')
     }
 
     def 'simplified listTagsParam usage'() {
@@ -122,14 +154,19 @@ class BuildParametersContextSpec extends Specification {
         context.buildParameterNodes.size() == 1
         with(context.buildParameterNodes['myParameterName']) {
             name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
             name.text() == 'myParameterName'
+            defaultValue.text().empty
             tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
             tagsFilter.text() == '^mytagsfilterregex'
             reverseByDate.text() == 'true'
             reverseByName.text() == 'true'
             maxTags.text() == 'all'
+            description.text().empty
+            credentialsId.text().empty
+            !uuid.text().empty
         }
-        1 * jobManagement.requirePlugin('subversion')
+        (1.._) * jobManagement.requirePlugin('subversion')
     }
 
     def 'simplest listTagsParam usage'() {
@@ -141,12 +178,106 @@ class BuildParametersContextSpec extends Specification {
         context.buildParameterNodes.size() == 1
         with(context.buildParameterNodes['myParameterName']) {
             name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
             name.text() == 'myParameterName'
+            defaultValue.text().empty
             tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
             tagsFilter.text() == '^mytagsfilterregex'
             reverseByDate.text() == 'false'
             reverseByName.text() == 'false'
             maxTags.text() == 'all'
+            description.text().empty
+            credentialsId.text().empty
+            !uuid.text().empty
+        }
+        (1.._) * jobManagement.requirePlugin('subversion')
+    }
+
+    def 'simplest closure listTagsParam usage'() {
+        when:
+        context.listTagsParam('myParameterName', 'http://kenai.com/svn/myProject/tags') {
+        }
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['myParameterName']) {
+            name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
+            name.text() == 'myParameterName'
+            defaultValue.text().empty
+            tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
+            tagsFilter.text().empty
+            reverseByDate.text() == 'false'
+            reverseByName.text() == 'false'
+            maxTags.text().empty
+            description.text().empty
+            credentialsId.text().empty
+            !uuid.text().empty
+        }
+        1 * jobManagement.requirePlugin('subversion')
+    }
+
+    def 'listTagsParam with all closure options'() {
+        when:
+        context.listTagsParam('myParameterName', 'http://kenai.com/svn/myProject/tags') {
+            description('lorem ipsum')
+            tagFilterRegex(/myfilter/)
+            sortNewestFirst()
+            sortZtoA()
+            maxTagsToDisplay('40')
+            defaultValue('test')
+            credentialsId('CREDENTIALS')
+        }
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['myParameterName']) {
+            name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
+            name.text() == 'myParameterName'
+            defaultValue.text() == 'test'
+            tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
+            tagsFilter.text() == 'myfilter'
+            reverseByDate.text() == 'true'
+            reverseByName.text() == 'true'
+            maxTags.text() == '40'
+            description.text() == 'lorem ipsum'
+            credentialsId.text() == 'CREDENTIALS'
+            !uuid.text().empty
+        }
+        1 * jobManagement.requirePlugin('subversion')
+    }
+
+    def 'listTagsParam with maxTagsToDisplay int argument'() {
+        when:
+        context.listTagsParam('myParameterName', 'http://kenai.com/svn/myProject/tags') {
+            description('lorem ipsum')
+            tagFilterRegex(/myfilter/)
+            sortNewestFirst()
+            sortZtoA()
+            maxTagsToDisplay(40)
+            defaultValue('test')
+            credentialsId('CREDENTIALS')
+        }
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['myParameterName']) {
+            name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
+            name.text() == 'myParameterName'
+            defaultValue.text() == 'test'
+            tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
+            tagsFilter.text() == 'myfilter'
+            reverseByDate.text() == 'true'
+            reverseByName.text() == 'true'
+            maxTags.text() == '40'
+            description.text() == 'lorem ipsum'
+            credentialsId.text() == 'CREDENTIALS'
+            !uuid.text().empty
         }
         1 * jobManagement.requirePlugin('subversion')
     }
@@ -192,6 +323,7 @@ class BuildParametersContextSpec extends Specification {
         context.buildParameterNodes.size() == 1
         with(context.buildParameterNodes['myParameterName']) {
             name() == 'hudson.scm.listtagsparameter.ListSubversionTagsParameterDefinition'
+            children().size() == 10
             name.text() == 'myParameterName'
             tagsDir.text() == 'http://kenai.com/svn/myProject/tags'
             tagsFilter.text() == ''
@@ -199,7 +331,7 @@ class BuildParametersContextSpec extends Specification {
             reverseByName.text() == 'false'
             maxTags.text() == 'all'
         }
-        1 * jobManagement.requirePlugin('subversion')
+        (1.._) * jobManagement.requirePlugin('subversion')
 
         where:
         filter << [null, '']
@@ -961,14 +1093,335 @@ class BuildParametersContextSpec extends Specification {
                 scriptlerScriptId.text() == 'scriptler-1.groovy'
                 children().size() == 2
                 with(parameters[0]) {
-                  children().size() == 2
-                  entry[0].string[0].text() == 'param1'
-                  entry[0].string[1].text() == 'x1'
-                  entry[1].string[0].text() == 'param2'
-                  entry[1].string[1].text() == 'x2'
+                    children().size() == 2
+                    entry[0].string[0].text() == 'param1'
+                    entry[0].string[1].text() == 'x1'
+                    entry[1].string[0].text() == 'param2'
+                    entry[1].string[1].text() == 'x2'
                 }
             }
         }
         1 * jobManagement.requireMinimumPluginVersion('uno-choice', '1.2')
+    }
+
+    def 'active choice reactive param without options'() {
+        when:
+        context.activeChoiceReactiveParam('activeChoiceReferenceParam') {
+        }
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['activeChoiceReferenceParam']) {
+            name() == 'org.biouno.unochoice.CascadeChoiceParameter'
+            children().size() == 8
+            parameters[0].attributes()['class'] == 'linked-hash-map'
+            description.text() == ''
+            randomName.text() =~ /choice-parameter-\d+/
+            visibleItemCount.text() == '1'
+            filterable.text() == 'false'
+            choiceType.text() == 'PT_SINGLE_SELECT'
+            script.text() == ''
+            referencedParameters.text() == ''
+        }
+    }
+
+    def 'active choice reactive param with all options and groovy script'() {
+        when:
+        context.activeChoiceReactiveParam('activeChoiceReferenceScriptlerParam') {
+            description('Active choice param test')
+            filterable()
+            choiceType('SINGLE_SELECT')
+            groovyScript {
+                script('x1')
+                fallbackScript('x2')
+            }
+            referencedParameter('param1')
+            referencedParameter('param2')
+        }
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['activeChoiceReferenceScriptlerParam']) {
+            children().size() == 9
+            parameters[0].attributes()['class'] == 'linked-hash-map'
+            name() == 'org.biouno.unochoice.CascadeChoiceParameter'
+            description.text() == 'Active choice param test'
+            randomName.text() =~ /choice-parameter-\d+/
+            visibleItemCount.text() == '1'
+            filterable.text() == 'true'
+            choiceType.text() == 'PT_SINGLE_SELECT'
+            with(script[0]) {
+                attributes()['class'] == 'org.biouno.unochoice.model.GroovyScript'
+                children().size() == 2
+                script.text() == 'x1'
+                fallbackScript.text() == 'x2'
+            }
+            referencedParameters.text() == 'param1, param2'
+        }
+    }
+
+    def 'active choice reactive reference param without options'() {
+        when:
+        context.activeChoiceReactiveReferenceParam('activeChoiceReactiveReferenceParam') {
+        }
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['activeChoiceReactiveReferenceParam']) {
+            name() == 'org.biouno.unochoice.DynamicReferenceParameter'
+            children().size() == 8
+            parameters[0].attributes()['class'] == 'linked-hash-map'
+            description.text() == ''
+            randomName.text() =~ /choice-parameter-\d+/
+            visibleItemCount.text() == '1'
+            choiceType.text() == 'ET_TEXT_BOX'
+            script.text() == ''
+            referencedParameters.text() == ''
+            omitValueField.text() == 'false'
+        }
+    }
+
+    def 'active choice reactive reference param with all options and scriptler script'() {
+        when:
+        context.activeChoiceReactiveReferenceParam('activeChoiceReactiveReferenceScriptlerParam') {
+            description('Active choice reactive reference param test with scriptler script')
+            omitValueField()
+            choiceType('FORMATTED_HIDDEN_HTML')
+            scriptlerScript('scriptler-2.groovy') {
+                parameter('script-param', 'x1')
+            }
+            referencedParameter('param3')
+            referencedParameter('param4')
+        }
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['activeChoiceReactiveReferenceScriptlerParam']) {
+            children().size() == 9
+            parameters[0].attributes()['class'] == 'linked-hash-map'
+            name() == 'org.biouno.unochoice.DynamicReferenceParameter'
+            description.text() == 'Active choice reactive reference param test with scriptler script'
+            randomName.text() =~ /choice-parameter-\d+/
+            visibleItemCount.text() == '1'
+            choiceType.text() == 'ET_FORMATTED_HIDDEN_HTML'
+            with(script[0]) {
+                attributes()['class'] == 'org.biouno.unochoice.model.ScriptlerScript'
+                scriptlerScriptId.text() == 'scriptler-2.groovy'
+                children().size() == 2
+                with(parameters[0]) {
+                    children().size() == 1
+                    entry[0].string[0].text() == 'script-param'
+                    entry[0].string[1].text() == 'x1'
+                }
+            }
+            referencedParameters.text() == 'param3, param4'
+        }
+    }
+
+    def 'credentials parameter with minimal options'() {
+        when:
+        context.credentialsParam('foo')
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['foo']) {
+            name() == 'com.cloudbees.plugins.credentials.CredentialsParameterDefinition'
+            children().size() == 5
+            name.text() == 'foo'
+            description.text() == ''
+            defaultValue.text() == ''
+            credentialType.text() == 'com.cloudbees.plugins.credentials.common.StandardCredentials'
+            required.text() == 'false'
+        }
+    }
+
+    def 'credentials parameter with all options'() {
+        when:
+        context.credentialsParam('foo') {
+            type('test')
+            defaultValue('bar')
+            description('hello')
+            required()
+        }
+
+        then:
+        context.buildParameterNodes.size() == 1
+        with(context.buildParameterNodes['foo']) {
+            name() == 'com.cloudbees.plugins.credentials.CredentialsParameterDefinition'
+            children().size() == 5
+            name.text() == 'foo'
+            description.text() == 'hello'
+            defaultValue.text() == 'bar'
+            credentialType.text() == 'test'
+            required.text() == 'true'
+        }
+    }
+
+    def 'credentials parameter with invalid type option'() {
+        when:
+        context.credentialsParam('foo') {
+            type(value)
+        }
+
+        then:
+        thrown(DslScriptException)
+
+        where:
+        value << [null, '']
+    }
+
+    def 'credentials parameter with invalid parameter name'() {
+        when:
+        context.credentialsParam(value)
+
+        then:
+        thrown(DslScriptException)
+
+        where:
+        value << [null, '']
+    }
+
+    def 'credentials parameter with duplicate parameter name'() {
+        when:
+        context.credentialsParam('foo')
+        context.credentialsParam('foo')
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'base globalVariableParam usage'() {
+        when:
+        context.globalVariableParam('myParameterName', '${MY_DEFAULT_GLOBAL_VARIABLE}',
+                'myGlobalVariableParameterDescription')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.global__variable__string__parameter.GlobalVariableStringParameterDefinition'
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].defaultValue.text() == '${MY_DEFAULT_GLOBAL_VARIABLE}'
+        context.buildParameterNodes['myParameterName'].description.text() == 'myGlobalVariableParameterDescription'
+    }
+
+    def 'simplified globalVariableParam usage'() {
+        when:
+        context.globalVariableParam('myParameterName', '${MY_DEFAULT_GLOBAL_VARIABLE}')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.global__variable__string__parameter.GlobalVariableStringParameterDefinition'
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].defaultValue.text() == '${MY_DEFAULT_GLOBAL_VARIABLE}'
+        context.buildParameterNodes['myParameterName'].description.text() == ''
+    }
+
+    def 'simplest globalVariableParam usage'() {
+        when:
+        context.globalVariableParam('myParameterName')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.global__variable__string__parameter.GlobalVariableStringParameterDefinition'
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].defaultValue.text() == ''
+        context.buildParameterNodes['myParameterName'].description.text() == ''
+    }
+
+    def 'globalVariableParam name argument cant be null'() {
+        when:
+        context.globalVariableParam(null)
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'globalVariableParam name argument cant be empty'() {
+        when:
+        context.globalVariableParam('')
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'globalVariableParam already defined'() {
+        when:
+        context.stringParam('one')
+        context.globalVariableParam('one')
+
+        then:
+        thrown(DslScriptException)
+    }
+
+    def 'base matrixCombinationsParam usage'() {
+        when:
+        context.matrixCombinationsParam('myParameterName', 'default_value', 'myGlobalVariableParameterDescription')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.matrix__configuration__parameter.MatrixCombinationsParameterDefinition'
+        context.buildParameterNodes['myParameterName'].children().size() == 3
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].defaultCombinationFilter.text() == 'default_value'
+        context.buildParameterNodes['myParameterName'].description.text() == 'myGlobalVariableParameterDescription'
+        1 * jobManagement.requireMinimumPluginVersion('matrix-combinations-parameter', '1.0.9')
+    }
+
+    def 'simplified matrixCombinationsParam usage'() {
+        when:
+        context.matrixCombinationsParam('myParameterName', 'default_value')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.matrix__configuration__parameter.MatrixCombinationsParameterDefinition'
+        context.buildParameterNodes['myParameterName'].children().size() == 3
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].defaultCombinationFilter.text() == 'default_value'
+        context.buildParameterNodes['myParameterName'].description.text() == ''
+        1 * jobManagement.requireMinimumPluginVersion('matrix-combinations-parameter', '1.0.9')
+    }
+
+    def 'simplest matrixCombinationsParam usage'() {
+        when:
+        context.matrixCombinationsParam('myParameterName')
+
+        then:
+        context.buildParameterNodes != null
+        context.buildParameterNodes.size() == 1
+        context.buildParameterNodes['myParameterName'].name() ==
+                'hudson.plugins.matrix__configuration__parameter.MatrixCombinationsParameterDefinition'
+        context.buildParameterNodes['myParameterName'].children().size() == 2
+        context.buildParameterNodes['myParameterName'].name.text() == 'myParameterName'
+        context.buildParameterNodes['myParameterName'].description.text() == ''
+        1 * jobManagement.requireMinimumPluginVersion('matrix-combinations-parameter', '1.0.9')
+    }
+
+    def 'matrixCombinationsParam name argument can not be null or empty'() {
+        when:
+        context.matrixCombinationsParam(name)
+
+        then:
+        thrown(DslScriptException)
+
+        where:
+        name << [null, '']
+    }
+
+    def 'matrixCombinationsParam already defined'() {
+        when:
+        context.stringParam('one')
+        context.matrixCombinationsParam('one')
+
+        then:
+        thrown(DslScriptException)
     }
 }

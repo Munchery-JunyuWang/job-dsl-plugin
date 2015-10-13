@@ -23,6 +23,11 @@ class PropertiesContext extends AbstractExtensibleContext {
     /**
      * Adds links in the sidebar of the project page.
      *
+     * The icon may be a plain filename of an image in Jenkins' {@code images/24x24} directory (such as
+     * {@code help.gif}, {@code document.gif} or {@code refresh.gif}), or {@code /userContent/filename.ext} for a custom
+     * icon placed in the {@code JENKINS_HOME/userContent} directory. User content can also be uploaded by using
+     * {@link javaposse.jobdsl.dsl.DslFactory#userContent(java.lang.String, java.io.InputStream)}.
+     *
      * @since 1.33
      */
     @RequiresPlugin(id = 'sidebar-link', minimumVersion = '1.7')
@@ -38,6 +43,10 @@ class PropertiesContext extends AbstractExtensibleContext {
     /**
      * Allows to configure a custom icon for each job.
      *
+     * The argument must point to a custom icon placed in the {@code JENKINS_HOME/userContent/customIcon} directory.
+     * User content can be uploaded by using
+     * {@link javaposse.jobdsl.dsl.DslFactory#userContent(java.lang.String, java.io.InputStream)}.
+     *
      * @since 1.33
      */
     @RequiresPlugin(id = 'custom-job-icon', minimumVersion = '0.2')
@@ -46,6 +55,51 @@ class PropertiesContext extends AbstractExtensibleContext {
 
         propertiesNodes << new NodeBuilder().'jenkins.plugins.jobicon.CustomIconProperty' {
             iconfile(iconFileName)
+        }
+    }
+
+    /**
+     * Changes the date pattern for the BUILD_ID or BUILD_TIMESTAMP variable.
+     *
+     * @since 1.39
+     */
+    @RequiresPlugin(id = 'zentimestamp', minimumVersion = '3.3')
+    void zenTimestamp(String pattern) {
+        propertiesNodes << new NodeBuilder().'hudson.plugins.zentimestamp.ZenTimestampJobProperty' {
+            changeBUILDID(true)
+            delegate.pattern(pattern)
+        }
+    }
+
+    /**
+     * Allows to configure job rebuild behaviour.
+     *
+     * @since 1.39
+     */
+    @RequiresPlugin(id = 'rebuild', minimumVersion = '1.25')
+    void rebuild(@DslContext(RebuildContext) Closure rebuildClosure) {
+        RebuildContext rebuildContext = new RebuildContext()
+        ContextHelper.executeInContext(rebuildClosure, rebuildContext)
+
+        propertiesNodes << new NodeBuilder().'com.sonyericsson.rebuild.RebuildSettings' {
+            autoRebuild(rebuildContext.autoRebuild)
+            rebuildDisabled(rebuildContext.rebuildDisabled)
+        }
+    }
+
+    /**
+     * Configures the GitHub project URL.
+     *
+     * The URL will be set automatically when using the
+     * {@link javaposse.jobdsl.dsl.helpers.ScmContext#github(java.lang.String)} or
+     * {@link javaposse.jobdsl.dsl.helpers.scm.RemoteContext#github(java.lang.String)} methods.
+     *
+     * @since 1.40
+     */
+    @RequiresPlugin(id = 'github', minimumVersion = '1.12.0')
+    void githubProjectUrl(String projectUrl) {
+        propertiesNodes << new NodeBuilder().'com.coravy.hudson.plugins.github.GithubProjectProperty' {
+            delegate.projectUrl(projectUrl ?: '')
         }
     }
 }

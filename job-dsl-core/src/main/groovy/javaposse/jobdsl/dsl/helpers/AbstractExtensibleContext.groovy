@@ -1,5 +1,6 @@
 package javaposse.jobdsl.dsl.helpers
 
+import com.thoughtworks.xstream.io.xml.XmlFriendlyNameCoder
 import javaposse.jobdsl.dsl.AbstractContext
 import javaposse.jobdsl.dsl.Item
 import javaposse.jobdsl.dsl.JobManagement
@@ -18,9 +19,17 @@ abstract class AbstractExtensibleContext extends AbstractContext implements Exte
         if (node == null) {
             throw new MissingMethodException(name, contextType, args)
         }
-        addExtensionNode(node)
+        if (node != JobManagement.NO_VALUE) {
+            addExtensionNode(node)
+        }
         null
     }
 
     protected abstract void addExtensionNode(Node node)
+
+    protected static Node toNamedNode(String name, Node node) {
+        Node namedNode = new Node(null, name, node.attributes(), node.children())
+        namedNode.attributes()['class'] = new XmlFriendlyNameCoder().decodeAttribute(node.name().toString())
+        namedNode
+    }
 }

@@ -2,7 +2,6 @@ package javaposse.jobdsl.dsl.views
 
 import javaposse.jobdsl.dsl.JobManagement
 import javaposse.jobdsl.dsl.View
-import javaposse.jobdsl.dsl.ViewType
 import spock.lang.Specification
 
 import static org.custommonkey.xmlunit.XMLUnit.compareXML
@@ -33,36 +32,6 @@ class NestedViewSpec extends Specification {
 
         then:
         compareXML(nestedViewColumnsXml, view.xml).similar()
-    }
-
-    def 'nested view with deprecated view method'() {
-        when:
-        view.views {
-            delegate.view {
-                name('foo')
-            }
-            delegate.view(type: ViewType.SectionedView) {
-                name('bar')
-            }
-        }
-
-        then:
-        compareXML(nestedViewViewsXml, view.xml).similar()
-        4 * jobManagement.logDeprecationWarning()
-    }
-
-    def 'nested view with other deprecated view method'() {
-        when:
-        view.views {
-            delegate.view('foo') {
-            }
-            delegate.view('bar', type: ViewType.SectionedView) {
-            }
-        }
-
-        then:
-        compareXML(nestedViewViewsXml, view.xml).similar()
-        2 * jobManagement.logDeprecationWarning()
     }
 
     def 'nested view with views'() {

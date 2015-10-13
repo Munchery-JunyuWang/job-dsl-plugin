@@ -8,6 +8,13 @@ import javaposse.jobdsl.dsl.helpers.ExtensibleContext
  */
 interface JobManagement {
     /**
+     * Marker value returned by
+     * {@link #callExtension(java.lang.String, javaposse.jobdsl.dsl.Item, java.lang.Class, java.lang.Object[])} to
+     * indicate that an extension method does not produce a node.
+     */
+    Node NO_VALUE = new Node(null, 'no-value')
+
+    /**
      * Gets (loads) the job configuration for the Jenkins job with the specified name.  If no name is supplied, an empty
      * configuration is returned.
      *
@@ -103,7 +110,7 @@ interface JobManagement {
      * @throws IOException if the file could not be read
      * @since 1.16
      */
-    InputStream streamFileInWorkspace(String filePath) throws IOException
+    InputStream streamFileInWorkspace(String filePath) throws IOException, InterruptedException
 
     /**
      * Streams a file from the workspace of the seed job.
@@ -113,7 +120,7 @@ interface JobManagement {
      * @throws IOException if the file could not be read
      * @since 1.16
      */
-    String readFileInWorkspace(String filePath) throws IOException
+    String readFileInWorkspace(String filePath) throws IOException, InterruptedException
 
     /**
      * Reads a file from the workspace of a job.
@@ -124,7 +131,7 @@ interface JobManagement {
      * @throws IOException if the file could not be read
      * @since 1.25
      */
-    String readFileInWorkspace(String jobName, String filePath) throws IOException
+    String readFileInWorkspace(String jobName, String filePath) throws IOException, InterruptedException
 
     /**
      * Stream to write to, for stdout.
@@ -241,7 +248,8 @@ interface JobManagement {
      * @param item the {@link Item} which is being built
      * @param contextType type of the context which is extended by the method to be called
      * @param args arguments for the method to be called
-     * @return a node to be appended to the given context or <code>null</code> if no extension has been found
+     * @return a node to be appended to the given context, {@link #NO_VALUE} if the extension method does not produce a
+     *         node or {@code null} if no extension has been found
      * @since 1.33
      */
     Node callExtension(String name, Item item, Class<? extends ExtensibleContext> contextType, Object... args)

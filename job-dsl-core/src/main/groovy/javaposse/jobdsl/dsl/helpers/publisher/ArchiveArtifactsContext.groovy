@@ -2,7 +2,6 @@ package javaposse.jobdsl.dsl.helpers.publisher
 
 import javaposse.jobdsl.dsl.AbstractContext
 import javaposse.jobdsl.dsl.JobManagement
-import javaposse.jobdsl.dsl.RequiresCore
 
 class ArchiveArtifactsContext extends AbstractContext {
     final List<String> patterns = []
@@ -17,44 +16,59 @@ class ArchiveArtifactsContext extends AbstractContext {
         super(jobManagement)
     }
 
+    /**
+     * Specifies the files to archive. Can be called multiple times to add more patterns.
+     */
     void pattern(String glob) {
         patterns << glob
     }
 
+    /**
+     * Specifies files that will not be archived.
+     */
     void exclude(String glob) {
         excludes = glob
     }
 
+    /**
+     * Keeps artifacts for the latest build only.
+     */
     @Deprecated
     void latestOnly(boolean latestOnly = true) {
         jobManagement.logDeprecationWarning()
         this.latestOnly = latestOnly
     }
 
+    /**
+     * If set, does not fail the build if archiving returns nothing. Defaults to {@code false}.
+     */
     void allowEmpty(boolean allowEmpty = true) {
         this.allowEmpty = allowEmpty
     }
 
     /**
+     * Fingerprints all archived artifacts. Defaults to {@code false}.
+     *
      * @since 1.33
      */
-    @RequiresCore(minimumVersion = '1.571')
     void fingerprint(boolean fingerprint = true) {
         this.fingerprint = fingerprint
     }
 
     /**
+     * Archives artifacts only if the build is successful. Defaults to {@code false}.
+     *
      * @since 1.33
      */
-    @RequiresCore(minimumVersion = '1.567')
     void onlyIfSuccessful(boolean onlyIfSuccessful = true) {
         this.onlyIfSuccessful = onlyIfSuccessful
     }
 
     /**
+     * Uses default excludes. Defaults to {@code true}.
+     *
      * @since 1.33
      */
-    @RequiresCore(minimumVersion = '1.575')
     void defaultExcludes(boolean defaultExcludes = true) {
         this.defaultExcludes = defaultExcludes
     }

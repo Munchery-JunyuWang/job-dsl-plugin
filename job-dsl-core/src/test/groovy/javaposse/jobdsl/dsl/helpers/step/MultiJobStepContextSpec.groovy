@@ -23,35 +23,14 @@ class MultiJobStepContextSpec extends Specification {
 
         when:
         context.phase {
-            phaseName 'Second'
-            job('JobA')
+            phaseName('Second')
+            phaseJob('JobA')
         }
 
         then:
         def phaseNode2 = context.stepNodes[1]
         phaseNode2.phaseName[0].value() == 'Second'
         def jobNode = phaseNode2.phaseJobs[0].'com.tikal.jenkins.plugins.multijob.PhaseJobsConfig'[0]
-        jobNode.children().size() == 4
-        jobNode.jobName[0].value() == 'JobA'
-        jobNode.currParams[0].value() == true
-        jobNode.exposedSCM[0].value() == true
-        jobNode.configs[0].attribute('class') == 'java.util.Collections$EmptyList'
-    }
-
-    def 'call phases with minimal arguments and plugin version 1.11'() {
-        setup:
-        jobManagement.getPluginVersion('jenkins-multijob-plugin') >> new VersionNumber('1.11')
-
-        when:
-        context.phase {
-            phaseName 'Second'
-            job('JobA')
-        }
-
-        then:
-        def phaseNode = context.stepNodes[0]
-        phaseNode.phaseName[0].value() == 'Second'
-        def jobNode = phaseNode.phaseJobs[0].'com.tikal.jenkins.plugins.multijob.PhaseJobsConfig'[0]
         jobNode.children().size() == 6
         jobNode.jobName[0].value() == 'JobA'
         jobNode.currParams[0].value() == true
@@ -79,7 +58,7 @@ class MultiJobStepContextSpec extends Specification {
         jobNodeC.jobName[0].value() == 'JobC'
     }
 
-    def 'call phases with jobs with complex parameters'() {
+    def 'call phases with jobs with complex parameters using deprecated methods'() {
         when:
         context.phase('Fourth') {
             job('JobA', false, true) {
@@ -153,30 +132,91 @@ class MultiJobStepContextSpec extends Specification {
             'org.jvnet.jenkins.plugins.nodelabelparameter.parameterizedtrigger.NodeLabelBuildParameter'[0]
         nodeLabel.name[0].value() == 'nodeParam'
         nodeLabel.nodeLabel[0].value() == 'node_label'
+
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
     }
 
-    def 'call phases with multiple calls'() {
+    def 'call phases with jobs with complex parameters'() {
         when:
-        context.phase('Third') {
-            job('JobA') {
-                fileParam('my1.properties')
-                fileParam('my2.properties')
+        context.phase('Fourth') {
+            phaseJob('JobA') {
+                currentJobParameters(false)
+                parameters {
+                    booleanParam('aParam')
+                    booleanParam('bParam', false)
+                    booleanParam('cParam', true)
+                    propertiesFile('my.properties')
+                    sameNode()
+                    matrixSubset('it.name=="hello"')
+                    subversionRevision()
+                    gitRevision()
+                    predefinedProp('prop1', 'value1')
+                    predefinedProp('prop2', 'value2')
+                    predefinedProps([
+                            prop3: 'value3',
+                            prop4: 'value4'
+                    ])
+                    nodeLabel('nodeParam', 'node_label')
+                }
+                configure { phaseJobConfig ->
+                    phaseJobConfig / customConfig << 'foobar'
+                }
             }
         }
 
         then:
-        thrown(DslScriptException)
+        def phaseNode = context.stepNodes[0]
+        def jobNode = phaseNode.phaseJobs[0].'com.tikal.jenkins.plugins.multijob.PhaseJobsConfig'[0]
+        jobNode.currParams[0].value() == false
+        jobNode.exposedSCM[0].value() == true
 
-        when:
-        context.phase('Third') {
-            job('JobA') {
-                matrixParam('it.size=2')
-                matrixParam('it.size=3')
-            }
-        }
+        def customConfigNode = jobNode.customConfig[0]
+        customConfigNode.value() == 'foobar'
 
-        then:
-        thrown(DslScriptException)
+        def configsNode = jobNode.configs[0]
+        def boolParams = configsNode.'hudson.plugins.parameterizedtrigger.BooleanParameters'[0].configs[0]
+        boolParams.children().size() == 3
+        def boolNode = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[0]
+        boolNode.name[0].value() == 'aParam'
+        boolNode.value[0].value() == false
+        def boolNode1 = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[1]
+        boolNode1.name[0].value() == 'bParam'
+        boolNode1.value[0].value() == false
+        def boolNode2 = boolParams.'hudson.plugins.parameterizedtrigger.BooleanParameterConfig'[2]
+        boolNode2.name[0].value() == 'cParam'
+        boolNode2.value[0].value() == true
+
+        def fileNode = configsNode.'hudson.plugins.parameterizedtrigger.FileBuildParameters'[0]
+        fileNode.propertiesFile[0].value() == 'my.properties'
+        fileNode.failTriggerOnMissing[0].value() == false
+
+        def nodeNode = configsNode.'hudson.plugins.parameterizedtrigger.NodeParameters'[0]
+        nodeNode != null
+
+        def matrixNode = configsNode.'hudson.plugins.parameterizedtrigger.matrix.MatrixSubsetBuildParameters'[0]
+        matrixNode.filter[0].value() == 'it.name=="hello"'
+
+        def svnNode = configsNode.'hudson.plugins.parameterizedtrigger.SubversionRevisionBuildParameters'[0]
+        svnNode.includeUpstreamParameters[0].value() == false
+
+        def gitNode = configsNode.'hudson.plugins.git.GitRevisionBuildParameters'[0]
+        gitNode.combineQueuedCommits[0].value() == false
+
+        def propNode = configsNode.'hudson.plugins.parameterizedtrigger.PredefinedBuildParameters'[0]
+        def propStr = propNode.'properties'[0].value()
+        propStr.contains('prop1=value1')
+        propStr.contains('prop2=value2')
+        propStr.contains('prop3=value3')
+        propStr.contains('prop4=value4')
+
+        def nodeLabel = configsNode.
+        'org.jvnet.jenkins.plugins.nodelabelparameter.parameterizedtrigger.NodeLabelBuildParameter'[0]
+        nodeLabel.name[0].value() == 'nodeParam'
+        nodeLabel.nodeLabel[0].value() == 'node_label'
+
+        1 * jobManagement.logPluginDeprecationWarning('git', '2.2.6')
+        1 * jobManagement.requirePlugin('parameterized-trigger')
+        1 * jobManagement.logPluginDeprecationWarning('parameterized-trigger', '2.26')
     }
 
     def 'call phases with plugin version 1.11 options'() {
@@ -186,7 +226,7 @@ class MultiJobStepContextSpec extends Specification {
         when:
         context.phase {
             phaseName 'Second'
-            job('JobA') {
+            phaseJob('JobA') {
                 disableJob()
                 abortAllJobs()
                 killPhaseCondition('UNSTABLE')
@@ -213,7 +253,7 @@ class MultiJobStepContextSpec extends Specification {
         when:
         context.phase {
             phaseName 'Second'
-            job('JobA') {
+            phaseJob('JobA') {
                 disableJob()
                 abortAllJobs()
                 killPhaseCondition('UNSTABLE')
@@ -232,7 +272,7 @@ class MultiJobStepContextSpec extends Specification {
         when:
         context.phase {
             phaseName 'Second'
-            job('JobA') {
+            phaseJob('JobA') {
                 killPhaseCondition('UNKNOWN')
             }
         }
@@ -254,7 +294,6 @@ class MultiJobStepContextSpec extends Specification {
 
         where:
         condition | version
-        'FAILURE' | '1.10'
         'ALWAYS'  | '1.15'
     }
 
@@ -289,8 +328,8 @@ class MultiJobStepContextSpec extends Specification {
             runner('Fail')
             steps {
                 phase {
-                    phaseName 'Second'
-                    job('JobA')
+                    phaseName('Second')
+                    phaseJob('JobA')
                 }
             }
         }
@@ -307,7 +346,7 @@ class MultiJobStepContextSpec extends Specification {
                 with(children()[0]) {
                     name() == 'com.tikal.jenkins.plugins.multijob.MultiJobBuilder'
                     with(phaseJobs[0].'com.tikal.jenkins.plugins.multijob.PhaseJobsConfig'[0]) {
-                        children().size() == 4
+                        children().size() == 6
                         jobName[0].value() == 'JobA'
                     }
                 }

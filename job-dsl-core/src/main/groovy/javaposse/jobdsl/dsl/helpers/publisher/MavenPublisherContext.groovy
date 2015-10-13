@@ -11,6 +11,8 @@ class MavenPublisherContext extends PublisherContext {
     }
 
     /**
+     * Deploys artifacts to a Maven repository.
+     *
      * @since 1.31
      */
     void deployArtifacts(@DslContext(DeployArtifactsContext) Closure closure = null) {
@@ -18,7 +20,10 @@ class MavenPublisherContext extends PublisherContext {
         ContextHelper.executeInContext(closure, context)
 
         publisherNodes << new NodeBuilder().'hudson.maven.RedeployPublisher' {
-            id()
+            id(context.repositoryId ?: '')
+            if (context.repositoryUrl) {
+                url(context.repositoryUrl)
+            }
             uniqueVersion(context.uniqueVersion)
             evenIfUnstable(context.evenIfUnstable)
         }

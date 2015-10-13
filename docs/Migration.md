@@ -1,3 +1,246 @@
+## Migrating to 1.39
+
+### MultiJob
+
+A `phaseJob` method has been added to `phase` context to fix
+([JENKINS-27921](https://issues.jenkins-ci.org/browse/JENKINS-27921)). The `job` method within that context has been
+[[deprecated|Deprecation-Policy]] and will be removed. The `jobName` method within the `phaseJob` context has deprecated
+and will also be removed.
+
+DSL prior to 1.39
+```groovy
+multiJob('example') {
+    steps {
+        phase('first') {
+            job {
+                jobName('job-a')
+            }
+            job('job-b', false, false)
+        }
+    }
+}
+```
+
+DSL since 1.39
+```groovy
+multiJob('example') {
+    steps {
+        phase('first') {
+            phaseJob('job-a')
+            phaseJob('job-b') {
+                currentJobParameters(false)
+                exposedScm(false)
+            }
+        }
+    }
+}
+```
+
+### Subversion
+
+Support for versions older than 2.1 of the
+[Subversion Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Subversion+Plugin) is [[deprecated|Deprecation-Policy]]
+and will be removed.
+
+### Parameterized Trigger
+
+Support for versions older than 2.26 of the
+[Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed.
+
+### JSHint Checkstyle
+
+Support for the [JSHint Checkstyle Plugin](https://wiki.jenkins-ci.org/display/JENKINS/JSHint+Checkstyle+Plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed. The plugin is no longer available in the Jenkins Update Center.
+
+### ConfigFileType
+
+The implicit star import of `javaposse.jobdsl.dsl.ConfigFileType` in DSL scripts has been removed because the enum is
+no longer used by any DSL method. If the values are used in scripts nevertheless, they must be used fully qualified or
+imported explicitly.
+
+DSL prior to 1.39
+```groovy
+Custom
+MavenSettings
+```
+
+DSL since to 1.39
+```groovy
+javaposse.jobdsl.dsl.ConfigFileType.Custom
+javaposse.jobdsl.dsl.ConfigFileType.MavenSettings
+```
+
+### DslScriptLoader
+
+The signature of `DslScriptLoader.runDslEngineForParent` has changed and the method is no longer public. The change was
+necessary to avoid a class loader leak and to fix ([JENKINS-30348](https://issues.jenkins-ci.org/browse/JENKINS-30348)).
+Use `DslScriptLoader.runDslEngine` instead.
+
+## Migrating to 1.38
+
+### Parameterized Trigger
+
+Support for versions older than 2.25 of the
+[Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed.
+
+Some overloaded DSL methods for the
+[Parameterized Trigger Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Parameterized+Trigger+Plugin) have been
+replaced by new methods in the nested context. The overloaded methods have been [[deprecated|Deprecation-Policy]] and
+will be removed.
+
+DSL prior to 1.38
+```groovy
+job('example-1') {
+    steps {
+        downstreamParameterized {
+            trigger('Project1, Project2', 'ALWAYS', false,
+                    [buildStepFailure: 'FAILURE',
+                     failure         : 'FAILURE',
+                     unstable        : 'UNSTABLE'])
+        }
+    }
+}
+
+job('example-2') {
+    publishers {
+        downstreamParameterized {
+            trigger('Project1, Project2', 'UNSTABLE_OR_BETTER', true)
+        }
+    }
+}
+```
+
+DSL since to 1.38
+```groovy
+job('example-1') {
+    steps {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                block {
+                    buildStepFailure('FAILURE')
+                    failure('FAILURE')
+                    unstable('UNSTABLE']
+                }
+            }
+        }
+    }
+}
+
+job('example-2') {
+    publishers {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                condition('UNSTABLE_OR_BETTER')
+                triggerWithNoParameters()
+            }
+        }
+    }
+}
+```
+
+### Parameter Passing
+
+The way how parameters are passed to downstream jobs or multi-job phases has changed. The existing methods have been
+[[deprecated|Deprecation-Policy]] and will be removed.
+
+DSL prior to 1.38
+```groovy
+job('example-1') {
+    steps {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                predefinedProp('key1', 'value1')
+                predefinedProps('key2=value2\nkey3=value3')
+            }
+        }
+    }
+}
+
+job('example-2') {
+    publishers {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                currentBuild()
+                sameNode(true)
+            }
+        }
+    }
+}
+
+multiJob('example-3') {
+    steps {
+        phase('test') {
+             job('other', false, true) {
+                boolParam('cParam', true)
+                fileParam('my.properties')
+                sameNode()
+                matrixParam('it.name=="hello"')
+                subversionRevision()
+                gitRevision()
+                prop('prop1', 'value1')
+                nodeLabel('lParam', 'my_nodes')
+            }
+        }
+   }
+}
+```
+
+DSL since to 1.38
+```groovy
+job('example-1') {
+    steps {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                parameters {
+                    predefinedProp('key1', 'value1')
+                    predefinedProps([key2: 'value2', key3: 'value3'])
+                }
+            }
+        }
+    }
+}
+
+job('example-2') {
+    publishers {
+        downstreamParameterized {
+            trigger('Project1, Project2') {
+                parameters {
+                    currentBuild()
+                    sameNode()
+                }
+            }
+        }
+    }
+}
+
+multiJob('example-3') {
+    steps {
+        phase('test') {
+            job('other', false, true) {
+                parameters {
+                    booleanParam('cParam', true)
+                    propertiesFile('my.properties')
+                    sameNode()
+                    matrixSubset('it.name=="hello"')
+                    subversionRevision()
+                    gitRevision()
+                    predefinedProp('prop1', 'value1')
+                    nodeLabel('lParam', 'my_nodes')
+                }
+            }
+        }
+   }
+}
+```
+
+### GitHub Pull Request Builder
+
+Support for versions older than 1.26 of the
+[GitHub Pull Request Builder Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+pull+request+builder+plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed.
+
 ## Migrating to 1.37
 
 ### Multijob
@@ -5,6 +248,17 @@
 Support for versions older than 1.16 of the
 [Multijob Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Multijob+Plugin) is [[deprecated|Deprecation-Policy]] and
 will be removed.
+
+### Git
+
+Support for versions older than 2.2.6 of the [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed.
+
+### Groovy Postbuild
+
+Support for versions older than 2.2 of the
+[Groovy Postbuild Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Groovy+Postbuild+Plugin) is
+[[deprecated|Deprecation-Policy]] and will be removed.
 
 ## Migrating to 1.36
 
@@ -94,13 +348,13 @@ job('example') {
 }
 ```
 
-## GitHub Pull Request Builder
+### GitHub Pull Request Builder
 
 Support for versions older than 1.15-0 of the
 [GitHub Pull Request Builder Plugin](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+pull+request+builder+plugin) is
 [[deprecated|Deprecation-Policy]] and will be removed.
 
-## Conditional Build Steps
+### Conditional Build Steps
 
 Usage build steps directly in the `conditionalSteps` context is [[deprecated|Deprecation-Policy]] and will be removed.
 
@@ -478,7 +732,7 @@ job {
 }
 ```
 
-## Finding Credentials by Description
+### Finding Credentials by Description
 
 Finding credentials by description has been [[deprecated|Deprecation-Policy]]. The argument passed to the `credentials`
 methods (e.g. for Git or Subversion SCM) has been used to find credentials by comparing the value to the credential's
@@ -722,7 +976,7 @@ job {
 }
 ```
 
-See the [[Job Reference]] for further details.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/job-publishers-archiveJunit) for further details.
 
 ### Xvnc
 
@@ -749,7 +1003,7 @@ job {
 }
 ```
 
-See the [[Job Reference]] for further details.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/job-wrappers-xvnc) for further details.
 
 ### Gerrit Trigger
 
@@ -794,7 +1048,7 @@ job {
 }
 ```
 
-See the [[Job Reference]] for further details.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/job-triggers-gerrit-events) for further details.
 
 ### AbstractStepContext
 
@@ -844,7 +1098,7 @@ timeout {
 }
 ```
 
-See the [[Job Reference]] for further details.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/job-wrappers-timeout) for further details.
 
 ### Gerrit Trigger
 
@@ -853,15 +1107,18 @@ Before 1.24, the Gerrit trigger configuration used hardwired configuration for u
 plugin configuration). Now the Gerrit trigger configuration correctly honors central configuration of labels. If you use
 non-default labels in your central configuration, you might need to change the trigger label configuration of your jobs.
 
-See the [[Job Reference]] for further details.
+See the [API Viewer](https://jenkinsci.github.io/job-dsl-plugin/#path/job-triggers-gerrit) for further details.
 
 ## Migrating to 1.20
 
-In version 1.20, some implementation classes have been moved to work around a [bug](http://jira.codehaus.org/browse/GROOVY-5875) in Groovy. When these classes have been used to [extend the DSL](Extending-the-DSL-from-your-Job-Scripts), import statements and fully qualified class names have to be adjusted.
+In version 1.20, some implementation classes have been moved to work around a
+[bug](http://jira.codehaus.org/browse/GROOVY-5875) in Groovy. When these classes have been used to extend the DSL,
+import statements and fully qualified class names have to be adjusted.
 
 ## Migrating to 1.19
 
-In version 1.19 all build wrapper elements have been moved from the job element to a wrappers sub-element. When upgrading to 1.19 or later, the wrapper elements have to moved as shown below.
+In version 1.19 all build wrapper elements have been moved from the job element to a wrappers sub-element. When
+upgrading to 1.19 or later, the wrapper elements have to moved as shown below.
 
 DSL prior to 1.19:
 

@@ -9,7 +9,7 @@ import javaposse.jobdsl.dsl.Preconditions
 import javaposse.jobdsl.dsl.RequiresPlugin
 import javaposse.jobdsl.dsl.WithXmlAction
 import javaposse.jobdsl.dsl.helpers.AbstractExtensibleContext
-import javaposse.jobdsl.dsl.helpers.common.DownstreamContext
+import javaposse.jobdsl.dsl.helpers.common.Threshold
 import javaposse.jobdsl.dsl.helpers.triggers.GerritContext.GerritSpec
 
 class TriggerContext extends AbstractExtensibleContext {
@@ -92,6 +92,9 @@ class TriggerContext extends AbstractExtensibleContext {
         triggerNodes << urlTriggerNode
     }
 
+    /**
+     * Triggers the job based on regular intervals.
+     */
     void cron(String cronString) {
         Preconditions.checkNotNull(cronString, 'cronString must be specified')
 
@@ -100,6 +103,9 @@ class TriggerContext extends AbstractExtensibleContext {
         }
     }
 
+    /**
+     * Polls source control for changes at regular intervals.
+     */
     void scm(String cronString, @DslContext(ScmTriggerContext) Closure scmTriggerClosure = null) {
         Preconditions.checkNotNull(cronString, 'cronString must be specified')
 
@@ -125,13 +131,16 @@ class TriggerContext extends AbstractExtensibleContext {
     }
 
     /**
-     * Configures the Jenkins GitHub pull request builder plugin.
+     * Builds pull requests from GitHub and will report the results back to the pull request.
+     *
+     * The pull request builder plugin requires a special Git SCM configuration, see the plugin documentation for
+     * details.
      *
      * @since 1.22
      */
     @RequiresPlugin(id = 'ghprb')
     void pullRequest(@DslContext(PullRequestBuilderContext) Closure contextClosure) {
-        jobManagement.logPluginDeprecationWarning('ghprb', '1.15-0')
+        jobManagement.logPluginDeprecationWarning('ghprb', '1.26')
 
         PullRequestBuilderContext pullRequestBuilderContext = new PullRequestBuilderContext(jobManagement)
         ContextHelper.executeInContext(contextClosure, pullRequestBuilderContext)
@@ -153,28 +162,15 @@ class TriggerContext extends AbstractExtensibleContext {
             if (!jobManagement.getPluginVersion('ghprb')?.isOlderThan(new VersionNumber('1.15-0'))) {
                 allowMembersOfWhitelistedOrgsAsAdmin pullRequestBuilderContext.allowMembersOfWhitelistedOrgsAsAdmin
             }
-            if (!jobManagement.getPluginVersion('ghprb')?.isOlderThan(new VersionNumber('1.22-0'))) {
-                'extensions' {
-                    'org.jenkinsci.plugins.ghprb.extensions.status.GhprbSimpleStatus' {
-                        commitStatusContext pullRequestBuilderContext.commitStatusContext ?: ''
-                        triggeredStatus pullRequestBuilderContext.triggeredStatus ?: ''
-                        startedStatus pullRequestBuilderContext.startedStatus ?: ''
-                        'completedStatus' {
-                            'org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage' {
-                                message pullRequestBuilderContext.buildResultSuccessMessage ?: ''
-                                result pullRequestBuilderContext.buildResultSuccess
-                            }
-                            'org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage' {
-                                message pullRequestBuilderContext.buildResultFailureMessage ?: ''
-                                result pullRequestBuilderContext.buildResultFailure
-                            }
-                        }
-                    }
-                }
+            if (!jobManagement.getPluginVersion('ghprb')?.isOlderThan(new VersionNumber('1.26'))) {
+                extensions(pullRequestBuilderContext.extensionContext.extensionNodes)
             }
         }
     }
 
+    /**
+     * Polls Gerrit for changes.
+     */
     @RequiresPlugin(id = 'gerrit-trigger')
     void gerrit(@DslContext(GerritContext) Closure contextClosure = null) {
         // See what they set up in the contextClosure before generating xml
@@ -265,13 +261,17 @@ class TriggerContext extends AbstractExtensibleContext {
     }
 
     /**
+     * Starts a build on completion of an upstream job, i.e. adds the "Build after other projects are built" trigger.
+     *
+     * Possible thresholds are {@code 'SUCCESS'}, {@code 'UNSTABLE'} or {@code 'FAILURE'}.
+     *
      * @since 1.33
      */
     void upstream(String projects, String threshold = 'SUCCESS') {
         Preconditions.checkNotNullOrEmpty(projects, 'projects must be specified')
         Preconditions.checkArgument(
-                DownstreamContext.THRESHOLD_COLOR_MAP.containsKey(threshold),
-                "threshold must be one of ${DownstreamContext.THRESHOLD_COLOR_MAP.keySet().join(', ')}"
+                Threshold.THRESHOLD_COLOR_MAP.containsKey(threshold),
+                "threshold must be one of ${Threshold.THRESHOLD_COLOR_MAP.keySet().join(', ')}"
         )
 
         triggerNodes << new NodeBuilder().'jenkins.triggers.ReverseBuildTrigger' {
@@ -279,8 +279,8 @@ class TriggerContext extends AbstractExtensibleContext {
             upstreamProjects(projects)
             delegate.threshold {
                 name(threshold)
-                ordinal(DownstreamContext.THRESHOLD_ORDINAL_MAP[threshold])
-                color(DownstreamContext.THRESHOLD_COLOR_MAP[threshold])
+                ordinal(Threshold.THRESHOLD_ORDINAL_MAP[threshold])
+                color(Threshold.THRESHOLD_COLOR_MAP[threshold])
                 completeBuild(true)
             }
         }
